@@ -22,35 +22,22 @@ CORS(app, supports_credentials=True, resources={
 GOOGLE_CREDENTIALS_FILE = "credenciais_drive.json"
 GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"  # Copie da URL da pasta
 
-def upload_para_google_drive(df, filename):
-    # Autentica com conta de serviço
-    credentials = service_account.Credentials.from_service_account_file(
-        GOOGLE_CREDENTIALS_FILE,
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    service = build("drive", "v3", credentials=credentials)
+def upload_para_google_drive(df, nome_arquivo):
+    service = build('drive', 'v3', credentials=credenciais)
 
-    # Salva o Excel em memória
-    file_stream = BytesIO()
-    df.to_excel(file_stream, index=False)
-    file_stream.seek(0)
+    # Exportar DataFrame para bytes
+    arquivo = io.BytesIO()
+    df.to_excel(arquivo, index=False)
+    arquivo.seek(0)
 
-    # Prepara upload
-    media = MediaIoBaseUpload(file_stream, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    media = MediaIoBaseUpload(arquivo, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-    file_metadata = {
-        "name": filename,
-        "parents": [GOOGLE_DRIVE_FOLDER_ID]
-    }
+    # Upload simples no root do Drive
+    file_metadata = {'name': nome_arquivo}
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-    # Faz o upload
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id"
-    ).execute()
+    return file.get('id')
 
-    return file.get("id")
 # Rota para servir o index.html (homepage)
 @app.route('/')
 def home():
