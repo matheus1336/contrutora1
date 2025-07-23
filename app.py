@@ -159,31 +159,19 @@ def enviar_email():
 @app.route('/api/salvar-dashboard', methods=['POST'])
 def salvar_dashboard():
     dados_recebidos = request.get_json()
-    caminho_excel = 'database.xlsx'
 
     try:
-        if os.path.exists(caminho_excel):
-            df = pd.read_excel(caminho_excel)
-        else:
-            df = pd.DataFrame()
+        df = pd.DataFrame(dados_recebidos)
+        df['id'] = df['id'].astype(str)
 
-        df_novos = pd.DataFrame(dados_recebidos)
-        if not df.empty:
-            df['id'] = df['id'].astype(str)
-        df_novos['id'] = df_novos['id'].astype(str)
+        file_id = upload_para_google_drive(df, "dashboard.xlsx")
 
-        if not df.empty:
-            df = df[~df['id'].isin(df_novos['id'])]
-
-        df_final = pd.concat([df, df_novos], ignore_index=True)
-        df_final.to_excel(caminho_excel, index=False)
-
-        print(f"Dados salvos com sucesso em {caminho_excel}")
-        return jsonify({"success": True, "message": "Dados salvos no Excel com sucesso!"})
+        return jsonify({"success": True, "message": f"Salvo no Google Drive com ID {file_id}"})
 
     except Exception as e:
-        print(f"Erro ao salvar no Excel: {e}")
-        return jsonify({"error": "Falha ao salvar no Excel", "message": str(e)}), 500
+        print(f"Erro ao salvar no Drive: {e}")
+        return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
+
 
 
 
