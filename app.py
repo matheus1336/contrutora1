@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 import requests
 import smtplib
@@ -6,21 +6,25 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 import pandas as pd
-from flask import render_template
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-from io import BytesIO
-import json
+import io
 
 app = Flask(__name__)
-# Permitir acesso apenas do domínio do frontend ou de todos (*)
-
 CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
 })
-GOOGLE_CREDENTIALS_FILE = "credenciais_drive.json"
-GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"  # Copie da URL da pasta
+
+# Carrega credenciais do Google Drive a partir da variável de ambiente
+GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
+
+credenciais_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+if not credenciais_json:
+    raise Exception("❌ Variável GOOGLE_SERVICE_ACCOUNT_JSON não está definida!")
+credenciais_dict = json.loads(credenciais_json)
+credenciais = service_account.Credentials.from_service_account_info(credenciais_dict)
 
 def upload_para_google_drive(df, nome_arquivo):
     service = build('drive', 'v3', credentials=credenciais)
@@ -32,30 +36,27 @@ def upload_para_google_drive(df, nome_arquivo):
 
     media = MediaIoBaseUpload(arquivo, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-    # Upload simples no root do Drive
-    file_metadata = {'name': nome_arquivo}
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    file_metadata = {
+        'name': nome_arquivo,
+        'parents': [GOOGLE_DRIVE_FOLDER_ID]
+    }
 
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
     return file.get('id')
 
-# Rota para servir o index.html (homepage)
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# Rota para servir o dashboard.html
-
 @app.route('/dashboard.html')
 def dashboard_html():
-    return render_template('dashboard.html')  # ✅ CORRETO
-
-
+    return render_template('dashboard.html')
 
 def login():
     url = "https://api.rededeobras.com.br/api/authorization/api/Authorization/Login"
     payload = {
         "login": "integracao_jacuzzi",
-        "password": "<_-54bg5-"  # Em produção, use variável de ambiente
+        "password": "<_-54bg5-"
     }
     headers = {
         "accept": "*/*",
@@ -159,10 +160,6 @@ def salvar_dashboard():
         print(f"Erro ao salvar no Drive: {e}")
         return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
 
-
-
-
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 10000))  # padrão do Render
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
