@@ -17,7 +17,7 @@ CORS(app, supports_credentials=True, resources={
 # Rota para servir o index.html (homepage)
 @app.route('/')
 def home():
-    return send_from_directory('.', 'index.html')
+    return render_template('index.html')
 
 # Rota para servir o dashboard.html
 
