@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "loyal-order-450812-r5",
+  "private_key_id": "98a346560032fb960c01a8807171c58daf62d8ef",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCkIFA27lWmhI2g\nRLnYX1Uq6DBg8Lrlofkc8g4iUdiDMwpL/6/VXss8aVZ8rFqLYgb7lyQgHe0l8KID\nHCxuRsH0QZk0dWsYvLyTqmgF0taxokEAlTlYQee/+Ypy6Y/qOUVTkxp0Iasgqysr\nqM27KU7mWX+67u/maKoiP7xf8xyQ37bqx02q7ccOsA/biPWl1JLx/RtZ2JryDA4V\nMY+0a28w1oDEbWJ6oOMw3FmxlfllpV2XGiQvqH+IkirjV0MYsoYnyHp0gIpLAXLt\nozgq5j7+vxIV9oGX2KIemruZMCqR+0VinYx2QLqeIA+mnd4FNh/jVI5cb9OCs+J/\nIOd4mc9zAgMBAAECggEADrKqHFE5sGDcggbFkd/vs5j5hCTqx9e6hGIU6/PibNVs\nTaQHLheAIdfZG+8faK4NrAg7/vhPHX+wMpEaVYHWqrYZLz54qc11IdA34pWgDmZW\nZeP3L7UvONzzDhlmfvZEBBj/XHkLZzCM/CrwyZsIas6HBsmRCFRFMC3/A6S04TBS\n3HnE+zFXRIt+gmlzmW5GRBsS60fBCjdJgTQ50TTNTq9UGnq9ULGcFGzpw32GCsER\nuKf9IZlWYRo54G81MG+dk1+NqNSwdtIAs7I/gx6nInFsIHGJzWUypm8Fjpfv/5S2\nReMRYgzyyc3o3C1LCI+mg52RwPg55D4w1GyubTzJcQKBgQDZus3NSzots2gmnixM\nzzdSQmj90iMwCd2Fd6R4rnZxyJXYgyiGxnC76oRr+nF4UWt4w7gOpVaP1dCkQIyk\nqevwQYA32RPzvv+UEszXToHSxArvRt8Ogy2okYLyKlKbIMtinSpxYeFWHVi9CG5H\nSiQfaSbq9PwHhfhqg3/z/DnqiwKBgQDA+YK0+uJLgGk70IjCAvr1pQIIwIPPDroK\nGU9eO/lUUZYo5VOymIlzkBqBN6G2EGIAqqfXGIqOBB9lG5GgD+myxpv2sXrtBWwa\nie0jbeXqog5yM4+QycYlwNbh1Te9FrCy+3qNh9x/u2ptye3Yg7tIsuEdS7YlvBXY\nF6dISOUTuQKBgEVa5+uZJvMfzvFeOSZOa4Tceq0/ns3SlqnJLq7yg/BCwNizDtm/\npHF3hq8Om86DwQQ69ApWSHiQ12E63pIlPm7NrpYbo+tkz+zPAEklTN1ibUlC/hKV\nXpnvoBKbwKyBicfj4H01fJ39wyKT6Oz0hQUsbaUyXIXY+wSS1tNVaO15AoGAahdC\nkrjzPEsGj8nfxbnZur7S1Xjxfh48jVzI06fpNT/9a9JYJ3HQ72WkDLJHB08Ocgtg\nZtKpKdZ+ZBm5/+N/ubeS+xcr268FdbmqU7YRluMtSf+qyBEGDK9t845DLIOS9XNo\nNvMgeGDS7DT9u/EAP8GIHZEIPMqgv8KRRx48QpECgYAmFEIOWx7m97sD9WGEFDPF\nfRiNlsdLayqEHeyhq+NFNjhobjB2V13Qqz7U692maTDOd04X5Fwe6yQThy5D1uxl\nn5GzhgKc0P3ubTuwfDuQWxTSDJxrTCj4fV82eZysZgfgS8iJqW7+MLmug5e4JXQK\nj6ZN4SoZRkuYTgUbMxkucQ==\n-----END PRIVATE KEY-----\n",
+  "client_email": "construtora@loyal-order-450812-r5.iam.gserviceaccount.com",
+  "client_id": "116636110076643342503",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/construtora%40loyal-order-450812-r5.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
