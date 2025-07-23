@@ -1,1 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lista de Obras</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
 
+    :root {
+        --bg-color: #1a1c20;
+        --primary-color: #00aaff;
+        --secondary-color: #252830;
+        --text-color: #e0e0e0;
+        --header-color: #1f2125;
+        --border-color: #333742;
+        --hover-color: #2c3038;
+        --success-color: #00c853;
+        --danger-color: #ff3d00;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        padding: 20px;
+    }
+
+    h1 {
+        color: var(--primary-color);
+        text-align: center;
+        margin-bottom: 20px;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+
+    .card {
+        background-color: var(--secondary-color);
+        padding: 25px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    #filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    #filters label {
+        font-weight: 400;
+        font-size: 0.9em;
+        color: var(--text-color);
+    }
+
+    #filters select, #filters input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        margin-top: 8px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-size: 1em;
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .button {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 1em;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    #dashboardBtn { background-color: var(--primary-color); }
+    #dashboardBtn:hover { background-color: #0088cc; }
+    #addObraBtn { background-color: var(--success-color); }
+    #addObraBtn:hover { background-color: #00a040; }
+    #btnLimpar { background-color: var(--danger-color); }
+    #btnLimpar:hover { background-color: #d32f2f; }
+
+    #table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: var(--secondary-color);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    th, td {
+        padding: 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+        background-color: var(--header-color);
+        color: var(--primary-color);
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    tr {
+        transition: background-color 0.3s ease;
+    }
+
+    tr:hover {
+        background-color: var(--hover-color);
+    }
+
+    .site-button, .delete-btn {
+        padding: 8px 12px;
+        text-decoration: none;
+        border-radius: 6px;
+        color: white;
+        font-size: 0.9em;
+        border: none;
+        cursor: pointer;
+        transition: opacity 0.3s;
+    }
+    .site-button { background-color: var(--primary-color); }
+    .delete-btn { background-color: var(--danger-color); }
+    .site-button:hover, .delete-btn:hover { opacity: 0.8; }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-content {
+        background-color: var(--secondary-color);
+        margin: 5% auto;
+        padding: 30px;
+        border: 1px solid var(--border-color);
+        width: 90%;
+        max-width: 800px;
+        border-radius: 12px;
+        position: relative;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-content h2 {
+        color: var(--primary-color);
+        margin-bottom: 20px;
+    }
+
+    .close-button {
+        color: #aaa;
+        position: absolute;
+        top: 15px;
+        right: 25px;
+        font-size: 32px;
+        font-weight: bold;
+        transition: color 0.3s;
+    }
+
+    .close-button:hover, .close-button:focus {
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    #addObraForm .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    #addObraForm label {
+        display: flex;
+        flex-direction: column;
+        color: var(--text-color);
+    }
+    
+    #addObraForm input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        margin-top: 8px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+    
+    #addObraForm button {
+        margin-top: 20px;
+        background-color: var(--success-color);
+    }
+  </style>
+</head>
+<body>
+  <h1>Dashboard de Obras</h1>
+  <div id="filters" class="card">
+    <label>
+      Cidade:
+      <select id="filterCidade">
+        <option value="">Todas</option>
+      </select>
+    </label>
+    <label>
+      Término da Obra (Ano/Mês):
+      <input type="text" id="filterTermino" placeholder="Ex: 2024/12">
+    </label>
+    <label>
+      Tipo de Obra:
+      <select id="filterTipo">
+        <option value="">Todos</option>
+      </select>
+    </label>
+    <label>
+      Padrão da Obra:
+      <select id="filterPadrao">
+        <option value="">Todos</option>
+      </select>
+    </label>
+    <label>
+      Fase da Obra:
+      <select id="filterFase">
+        <option value="">Todos</option>
+      </select>
+    </label>
+    <label>
+      Estado:
+      <select id="filterEstado">
+        <option value="">Todos</option>
+      </select>
+    </label>
+    <label>
+      Empresa:
+      <select id="filterEmpresa">
+        <option value="">Todas</option>
+      </select>
+    </label>
+    <button id="btnLimpar">Limpar Filtros</button>
+  </div>
+
+  <div class="button-group">
+    <button id="dashboardBtn" class="button">Levar para o Dashboard</button>
+    <button id="addObraBtn" class="button">+ Obras</button>
+  </div>
+  <div id="table-container" class="card">
+    <table id="obrasTable">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="selectAllCheckbox"></th>
+          <th>Ações</th>
+          <th>Nome da Obra</th>
+          <th>Tipo</th>
+          <th>Padrão</th>
+          <th>Fase</th>
+          <th>Cidade</th>
+          <th>Estado</th>
+          <th>Endereço</th>
+          <th>Empresa</th>
+          <th>Término</th>
+          <th>Atualização</th>
+          <th>Site</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="obraModal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2 id="modalObraNome"></h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div id="addObraModal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Adicionar Nova Obra</h2>
+      <form id="addObraForm">
+        <div class="form-grid">
+            <label>Nome da Obra: <input type="text" name="obraNome" required></label>
+            <label>Tipo: <input type="text" name="obraTipo"></label>
+            <label>Padrão: <input type="text" name="obraPadrao"></label>
+            <label>Fase: <input type="text" name="obraFase"></label>
+            <label>Cidade: <input type="text" name="obraCidade"></label>
+            <label>Estado: <input type="text" name="obraEstado"></label>
+            <label>Endereço: <input type="text" name="obraEndereco"></label>
+            <label>Empresa: <input type="text" name="empresaNomeFantasia"></label>
+            <label>Site da Empresa: <input type="text" name="empresaSite"></label>
+            <label>E-mail Contato: <input type="email" name="empresaContato1Email"></label>
+            <label>Telefone Contato: <input type="text" name="empresaContato1Telefone1"></label>
+            <label>Término: <input type="text" name="obraTermino"></label>
+            <label>Atualização: <input type="text" name="obraAtualizacao"></label>
+            <label>Representante: <input type="text" name="representante"></label>
+            <label>Preço (R$): <input type="number" step="0.01" name="precoProduto"></label>
+            <label>Produto Desejado: <input type="text" name="produtoDesejado"></label>
+            <label>Quantidade: <input type="number" name="qtdeProduto"></label>
+        </div>
+        <button type="submit" style="margin-top: 20px;">Adicionar Obra</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let obras = [];
+
+    function fillTable(filteredObras) {
+      const tbody = document.querySelector("#obrasTable tbody");
+      tbody.innerHTML = "";
+      filteredObras.forEach((obra) => {
+        const tr = document.createElement("tr");
+        tr.setAttribute('data-id', obra.id);
+        tr.innerHTML = `
+          <td><input type="checkbox" class="obra-checkbox" data-id="${obra.id}"></td>
+          <td><button class="delete-btn">Excluir</button></td>
+          <td>${obra.obraNome}</td>
+          <td>${obra.obraTipo}</td>
+          <td>${obra.obraPadrao}</td>
+          <td>${obra.obraFase}</td>
+          <td>${obra.obraCidade}</td>
+          <td>${obra.obraEstado}</td>
+          <td>${obra.obraEndereco}</td>
+          <td>${obra.empresaNomeFantasia}</td>
+          <td>${obra.obraTermino}</td>
+          <td>${obra.obraAtualizacao}</td>
+          <td><a href="http://${obra.empresaSite}" target="_blank" class="site-button">Visitar</a></td>
+        `;
+        tr.setAttribute('data-id', obra.id);
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'A') { // Não abre o modal se clicar no botão "Visitar"
+                showObraDetails(obra.id)
+            }
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function populateFilters() {
+        const cidades = [...new Set(obras.map(o => o.obraCidade).filter(Boolean))].sort();
+        const tipos = [...new Set(obras.map(o => o.obraTipo).filter(Boolean))].sort();
+        const padroes = [...new Set(obras.map(o => o.obraPadrao).filter(Boolean))].sort();
+        const fases = [...new Set(obras.map(o => o.obraFase).filter(Boolean))].sort();
+        const estados = [...new Set(obras.map(o => o.obraEstado).filter(Boolean))].sort();
+        const empresas = [...new Set(obras.map(o => o.empresaNomeFantasia).filter(Boolean))].sort();
+
+        function populateSelect(selectId, options) {
+            const select = document.getElementById(selectId);
+            options.forEach(opt => {
+                const option = document.createElement("option");
+                option.value = opt;
+                option.textContent = opt;
+                select.appendChild(option);
+            });
+        }
+
+        populateSelect("filterCidade", cidades);
+        populateSelect("filterTipo", tipos);
+        populateSelect("filterPadrao", padroes);
+        populateSelect("filterFase", fases);
+        populateSelect("filterEstado", estados);
+        populateSelect("filterEmpresa", empresas);
+    }
+
+    function applyFilters() {
+        const cidade = document.getElementById("filterCidade").value;
+        const tipo = document.getElementById("filterTipo").value;
+        const padrao = document.getElementById("filterPadrao").value;
+        const fase = document.getElementById("filterFase").value;
+        const estado = document.getElementById("filterEstado").value;
+        const empresa = document.getElementById("filterEmpresa").value;
+        const termino = document.getElementById("filterTermino").value;
+
+        let filtered = obras;
+        if (cidade) filtered = filtered.filter(o => o.obraCidade === cidade);
+        if (tipo) filtered = filtered.filter(o => o.obraTipo === tipo);
+        if (padrao) filtered = filtered.filter(o => o.obraPadrao === padrao);
+        if (fase) filtered = filtered.filter(o => o.obraFase === fase);
+        if (estado) filtered = filtered.filter(o => o.obraEstado === estado);
+        if (empresa) filtered = filtered.filter(o => o.empresaNomeFantasia === empresa);
+        if (termino) filtered = filtered.filter(o => o.obraTermino && o.obraTermino.includes(termino));
+
+        fillTable(filtered);
+    }
+
+    // Carregar os dados do backend
+    fetch("https://contrutora1.onrender.com/api/obras")
+      .then(res => {
+        if (!res.ok) throw new Error(`Erro na API: ${res.status} ${res.statusText}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data.error) throw new Error(data.message || "Erro desconhecido na API");
+        obras = data;
+        populateFilters();
+        applyFilters();
+      })
+      .catch(err => {
+        console.error("Erro ao carregar dados:", err);
+        alert("Não foi possível carregar os dados das obras.");
+      });
+
+    // Eventos dos filtros
+    document.getElementById("filterCidade").addEventListener("change", applyFilters);
+    document.getElementById("filterTipo").addEventListener("change", applyFilters);
+    document.getElementById("filterPadrao").addEventListener("change", applyFilters);
+    document.getElementById("filterFase").addEventListener("change", applyFilters);
+    document.getElementById("filterEstado").addEventListener("change", applyFilters);
+    document.getElementById("filterEmpresa").addEventListener("change", applyFilters);
+    document.getElementById("filterTermino").addEventListener("input", applyFilters);
+    document.getElementById("btnLimpar").addEventListener("click", () => {
+      document.getElementById("filterCidade").value = "";
+      document.getElementById("filterTipo").value = "";
+      document.getElementById("filterPadrao").value = "";
+      document.getElementById("filterFase").value = "";
+      document.getElementById("filterEstado").value = "";
+      document.getElementById("filterEmpresa").value = "";
+      document.getElementById("filterTermino").value = "";
+      applyFilters();
+    });
+
+    const modal = document.getElementById("obraModal");
+    const closeButton = document.querySelector(".close-button");
+
+    closeButton.onclick = function() {
+      modal.style.display = "none";
+    }
+
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+
+    function showObraDetails(obraId) {
+        // Prevent modal from opening when clicking on checkbox
+        if (event.target.type === 'checkbox') {
+            return;
+        }
+
+        const obra = obras.find(o => o.id == obraId);
+        if (!obra) return;
+
+        document.getElementById("modalObraNome").textContent = obra.obraNome;
+        const modalBody = document.getElementById("modalBody");
+        
+        // Limpa o conteúdo anterior
+        modalBody.innerHTML = '';
+
+        // Itera sobre as chaves do objeto obra e as exibe
+        for (const key in obra) {
+            if (Object.hasOwnProperty.call(obra, key)) {
+                const value = obra[key] || 'Não informado';
+                const p = document.createElement('p');
+                p.innerHTML = `<strong>${key}:</strong> ${value}`;
+                modalBody.appendChild(p);
+            }
+        }
+
+        modal.style.display = "block";
+    }
+
+    document.getElementById('selectAllCheckbox').addEventListener('change', function(e) {
+        const checkboxes = document.querySelectorAll('.obra-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = e.target.checked;
+        });
+    });
+
+    document.getElementById('dashboardBtn').addEventListener('click', function() {
+        const selectedIds = [];
+        const checkboxes = document.querySelectorAll('.obra-checkbox:checked');
+        checkboxes.forEach(checkbox => {
+            selectedIds.push(checkbox.getAttribute('data-id'));
+        });
+        
+        if (selectedIds.length > 0) {
+            const obrasParaAnalisar = obras.filter(o => selectedIds.includes(String(o.id)));
+            localStorage.setItem('obrasParaDashboard', JSON.stringify(obrasParaAnalisar));
+            window.location.href = 'dashboard.html';
+        } else {
+            alert("Por favor, selecione pelo menos uma obra para levar ao dashboard.");
+        }
+    });
+
+    // ===== LÓGICA DO MODAL DE ADICIONAR OBRA =====
+    const addObraModal = document.getElementById("addObraModal");
+    const addObraBtn = document.getElementById("addObraBtn");
+    const addObraCloseButton = addObraModal.querySelector(".close-button");
+
+    addObraBtn.onclick = function() {
+        addObraModal.style.display = "block";
+    }
+    addObraCloseButton.onclick = function() {
+        addObraModal.style.display = "none";
+    }
+    window.addEventListener('click', function(event) {
+        if (event.target == addObraModal) {
+            addObraModal.style.display = "none";
+        }
+    });
+
+    // Lógica de Exclusão na página inicial
+    document.querySelector('#obrasTable tbody').addEventListener('click', function(e) {
+        if (e.target.classList.contains('delete-btn')) {
+            const row = e.target.closest('tr');
+            const obraId = row.getAttribute('data-id');
+            if (confirm(`Tem certeza que deseja excluir a obra com ID ${obraId}?`)) {
+                // Remove da lista principal
+                obras = obras.filter(o => String(o.id) !== obraId);
+                // Remove da lista do dashboard no localStorage
+                let dashboardObras = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
+                dashboardObras = dashboardObras.filter(o => String(o.id) !== obraId);
+                localStorage.setItem('obrasParaDashboard', JSON.stringify(dashboardObras));
+                // Re-renderiza a tabela
+                applyFilters();
+            }
+        }
+    });
+
+    document.getElementById('addObraForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const novaObra = {
+            id: `NOVA-${Date.now()}`, // ID único para a nova obra
+            isParceiro: "False",
+            obraStatus: "Novo", // Status para identificar novas obras
+        };
+        formData.forEach((value, key) => {
+            novaObra[key] = value;
+        });
+
+        // Adiciona a nova obra à lista principal e atualiza a tabela
+        obras.unshift(novaObra); // Adiciona no início da lista
+        applyFilters(); 
+
+        // Adiciona a nova obra ao dashboard
+        const dashboardObras = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
+        dashboardObras.push(novaObra);
+        localStorage.setItem('obrasParaDashboard', JSON.stringify(dashboardObras));
+
+        alert(`Obra "${novaObra.obraNome}" adicionada com sucesso!`);
+        addObraModal.style.display = "none";
+        e.target.reset();
+    });
+  </script>
+</body>
+</html>
