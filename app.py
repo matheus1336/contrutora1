@@ -21,8 +21,8 @@ def home():
 
 # Rota para servir o dashboard.html
 
-@app.route('/dashboard')
-def dashboard():
+@app.route('/dashboard.html')
+def dashboard_html():
     return render_template('dashboard.html')  # ✅ CORRETO
 
 
