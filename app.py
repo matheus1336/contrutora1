@@ -17,15 +17,12 @@ CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
 })
 
-# ID da pasta do Google Drive onde o Excel será salvo (opcional)
 GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 
 def upload_para_google_drive(df, nome_arquivo):
     try:
-        # Corrige \n na chave privada para funcionar no Render
-        service_account_info = json.loads(
-            os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"].replace('\\n', '\n')
-        )
+        json_str = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
+        service_account_info = json.loads(json_str.replace('\\n', '\n'))
 
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info,
