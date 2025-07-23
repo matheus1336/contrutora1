@@ -11,6 +11,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
+from google.auth.transport.requests import Request
+import pickle
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={
@@ -21,15 +23,17 @@ GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 
 def upload_para_google_drive(df, nome_arquivo):
     try:
-        json_str = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-        service_account_info = json.loads(json_str.replace('\\n', '\n'))
+        # CAMINHO PARA O TOKEN GERADO VIA OAUTH
+        TOKEN_PATH = "/etc/secrets/token_drive.pkl"  # ou "token_drive.pkl" localmente
 
-        credentials = service_account.Credentials.from_service_account_info(
-            service_account_info,
-            scopes=["https://www.googleapis.com/auth/drive.file"]
-        )
+        with open(TOKEN_PATH, "rb") as token_file:
+            creds = pickle.load(token_file)
 
-        service = build("drive", "v3", credentials=credentials)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+
+        service = build("drive", "v3", credentials=creds)
 
         buffer = io.BytesIO()
         df.to_excel(buffer, index=False, engine="openpyxl")
