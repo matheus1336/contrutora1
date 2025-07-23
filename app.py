@@ -7,6 +7,11 @@ from email.mime.text import MIMEText
 import os
 import pandas as pd
 from flask import render_template
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from io import BytesIO
+import json
 
 app = Flask(__name__)
 # Permitir acesso apenas do domínio do frontend ou de todos (*)
@@ -14,6 +19,38 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
 })
+GOOGLE_CREDENTIALS_FILE = "credenciais_drive.json"
+GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"  # Copie da URL da pasta
+
+def upload_para_google_drive(df, filename):
+    # Autentica com conta de serviço
+    credentials = service_account.Credentials.from_service_account_file(
+        GOOGLE_CREDENTIALS_FILE,
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    service = build("drive", "v3", credentials=credentials)
+
+    # Salva o Excel em memória
+    file_stream = BytesIO()
+    df.to_excel(file_stream, index=False)
+    file_stream.seek(0)
+
+    # Prepara upload
+    media = MediaIoBaseUpload(file_stream, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    file_metadata = {
+        "name": filename,
+        "parents": [GOOGLE_DRIVE_FOLDER_ID]
+    }
+
+    # Faz o upload
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id"
+    ).execute()
+
+    return file.get("id")
 # Rota para servir o index.html (homepage)
 @app.route('/')
 def home():
