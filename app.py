@@ -17,32 +17,45 @@ CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
 })
 
-# Carrega credenciais do Google Drive a partir da variável de ambiente
+# ID da pasta do Google Drive onde o Excel será salvo (opcional)
 GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 
-credenciais_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
-if not credenciais_json:
-    raise Exception("❌ Variável GOOGLE_SERVICE_ACCOUNT_JSON não está definida!")
-credenciais_dict = json.loads(credenciais_json)
-credenciais = service_account.Credentials.from_service_account_info(credenciais_dict)
-
 def upload_para_google_drive(df, nome_arquivo):
-    service = build('drive', 'v3', credentials=credenciais)
+    try:
+        # Corrige \n na chave privada para funcionar no Render
+        service_account_info = json.loads(
+            os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"].replace('\\n', '\n')
+        )
 
-    # Exportar DataFrame para bytes
-    arquivo = io.BytesIO()
-    df.to_excel(arquivo, index=False)
-    arquivo.seek(0)
+        credentials = service_account.Credentials.from_service_account_info(
+            service_account_info,
+            scopes=["https://www.googleapis.com/auth/drive.file"]
+        )
 
-    media = MediaIoBaseUpload(arquivo, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        service = build("drive", "v3", credentials=credentials)
 
-    file_metadata = {
-        'name': nome_arquivo,
-        'parents': [GOOGLE_DRIVE_FOLDER_ID]
-    }
+        buffer = io.BytesIO()
+        df.to_excel(buffer, index=False, engine="openpyxl")
+        buffer.seek(0)
 
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    return file.get('id')
+        file_metadata = {
+            "name": nome_arquivo,
+            "parents": [GOOGLE_DRIVE_FOLDER_ID],
+            "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+
+        media = MediaIoBaseUpload(buffer, mimetype=file_metadata["mimeType"])
+        uploaded_file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id"
+        ).execute()
+
+        return uploaded_file.get("id")
+
+    except Exception as e:
+        print("Erro ao enviar para o Google Drive:", e)
+        raise
 
 @app.route('/')
 def home():
