@@ -411,7 +411,7 @@
     }
 
     // Carregar os dados do backend
-    fetch("https://contrutora1-2.onrender.com/api/obras")
+    fetch("https://contrutora1.onrender.com/api/obras")
       .then(res => {
         if (!res.ok) throw new Error(`Erro na API: ${res.status} ${res.statusText}`);
         return res.json();
