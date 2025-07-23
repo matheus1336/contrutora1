@@ -21,14 +21,9 @@ GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 
 def upload_para_google_drive(df, nome_arquivo):
     try:
-        # Carrega a string JSON diretamente da variável de ambiente
         json_str = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-        
-        # Converte a string JSON em um dicionário Python
-        # Não é necessário o .replace() se a variável de ambiente estiver formatada corretamente
-        service_account_info = json.loads(json_str)
+        service_account_info = json.loads(json_str.replace('\\n', '\n'))
 
-        # O restante do seu código permanece igual
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info,
             scopes=["https://www.googleapis.com/auth/drive.file"]
@@ -56,8 +51,7 @@ def upload_para_google_drive(df, nome_arquivo):
         return uploaded_file.get("id")
 
     except Exception as e:
-        # Adiciona mais detalhes ao log de erro para facilitar a depuração
-        print(f"Erro detalhado ao enviar para o Google Drive: {type(e).__name__} - {e}")
+        print("Erro ao enviar para o Google Drive:", e)
         raise
 
 @app.route('/')
