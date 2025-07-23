@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 import pandas as pd
+from flask import render_template
 
 app = Flask(__name__)
 # Permitir acesso apenas do domínio do frontend ou de todos (*)
@@ -19,9 +20,11 @@ def home():
     return send_from_directory('.', 'index.html')
 
 # Rota para servir o dashboard.html
+
 @app.route('/dashboard')
 def dashboard():
-    return send_from_directory('.', 'dashboard.html')
+    return render_template('dashboard.html')  # ✅ CORRETO
+
 
 
 def login():
