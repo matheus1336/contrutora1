@@ -22,7 +22,8 @@ GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 def upload_para_google_drive(df, nome_arquivo):
     try:
         json_str = os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
-        service_account_info = json.loads(json_str.replace('\\n', '\n'))
+        service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
+
 
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info,
