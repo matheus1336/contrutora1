@@ -29,7 +29,7 @@ def upload_para_google_drive(df, nome_arquivo):
         df.to_excel(caminho_excel, index=False)
 
         # Carrega credenciais do token
-        with open("token_drive.json", "r") as token_file:
+        with open("/etc/secrets/token_drive.json", "r") as token_file:
             token_info = json.load(token_file)
         creds = Credentials.from_authorized_user_info(token_info)
 
