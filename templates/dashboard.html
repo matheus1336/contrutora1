@@ -197,8 +197,8 @@
                             <button class="email-btn">E-mail</button>
                             <button class="whatsapp-btn">WhatsApp</button>
                         </td>
-                        <td><input type="text" class="editable" data-field="obraNome" value="${obra.obraNome || ''}"></td>
-                        <td><input type="text" class="editable" data-field="obraTipo" value="${obra.obraTipo || ''}"></td>
+                        <td>${obra.obraNome || ''}</td>
+                        <td>${obra.obraTipo || ''}</td>
                     <td>${obra.obraPadrao || ''}</td>
                     <td>${obra.obraFase || ''}</td>
                     <td>${obra.obraCidade || ''}</td>
@@ -230,7 +230,7 @@
                             <option value="CARACTERISTICAS DO PRODUTO">CARACTERISTICAS DO PRODUTO</option>
                         </select>
                     </td>
-                ;
+                `;
                 tableBody.appendChild(row);
                 });
             }
@@ -340,7 +340,7 @@
                 const obra = obras.find(o => String(o.id) === obraId);
 
                 if (e.target.classList.contains('delete-btn')) {
-                    if (confirm(Tem certeza que deseja excluir a obra "${obra.obraNome}"?)) {
+                    if (confirm(`Tem certeza que deseja excluir a obra "${obra.obraNome}"?`)) {
                         obras = obras.filter(o => String(o.id) !== obraId);
                         if (Array.isArray(obras)) {
     localStorage.setItem('obrasParaDashboard', JSON.stringify(obras));
@@ -374,7 +374,7 @@
                             throw new Error(result.message || 'Erro desconhecido');
                         }
                     } catch (error) {
-                        alert(Falha ao enviar e-mail: ${error.message});
+                        alert(`Falha ao enviar e-mail: ${error.message}`);
                     } finally {
                         e.target.textContent = 'E-mail';
                         e.target.disabled = false;
@@ -388,9 +388,9 @@
                         return;
                     }
                     // Remove caracteres não numéricos e adiciona o código do país (55 para o Brasil)
-                    const cleanPhone = 55${phone.replace(/\D/g, '')};
-                    const message = encodeURIComponent(Olá, equipe da ${obra.empresaNomeFantasia}! Gostaríamos de apresentar nossas soluções para a obra ${obra.obraNome}.);
-                    const whatsappUrl = https://wa.me/${cleanPhone}?text=${message};
+                    const cleanPhone = `55${phone.replace(/\D/g, '')}`;
+                    const message = encodeURIComponent(`Olá, equipe da ${obra.empresaNomeFantasia}! Gostaríamos de apresentar nossas soluções para a obra ${obra.obraNome}.`);
+                    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${message}`;
                     window.open(whatsappUrl, '_blank');
                 }
             });
@@ -438,7 +438,7 @@
                     }, 10);
 
                 } catch (error) {
-                    alert(Falha ao salvar dados no Excel: ${error.message});
+                    alert(`Falha ao salvar dados no Excel: ${error.message}`);
                 } finally {
                     button.textContent = 'Salvar e Atualizar Gráficos';
                     button.disabled = false;
@@ -461,7 +461,7 @@
                 const street = obra.obraEndereco;
                 const city = obra.obraCidade;
                 const state = obra.obraEstado;
-                const url = https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(street)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&format=json;
+                const url = `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(street)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&format=json`;
                 
                 try {
                     const response = await fetch(url);
@@ -470,10 +470,10 @@
                     if (data && data.length > 0) {
                         return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
                     }
-                    console.warn(Endereço não encontrado para: ${street}, ${city});
+                    console.warn(`Endereço não encontrado para: ${street}, ${city}`);
                     return null;
                 } catch (error) {
-                    console.error(Erro ao geocodificar o endereço "${street}, ${city}":, error);
+                    console.error(`Erro ao geocodificar o endereço "${street}, ${city}":`, error);
                     return null;
                 }
             }
@@ -527,16 +527,16 @@
                 markers.forEach(marker => map.removeLayer(marker));
                 markers.length = 0;
 
-                console.log(Iniciando geocodificação para ${data.length} obras...);
+                console.log(`Iniciando geocodificação para ${data.length} obras...`);
 
                 for (const obra of data) {
                     if (obra.obraEndereco && obra.obraCidade && obra.obraEstado) {
                         const coords = await geocodeAddress(obra); // Passa o objeto obra inteiro
                         if (coords) {
                             const marker = L.marker([coords.lat, coords.lon]).addTo(map);
-                            marker.bindPopup(<b>${obra.obraNome}</b><br>${obra.empresaNomeFantasia}<br>${obra.obraEndereco});
+                            marker.bindPopup(`<b>${obra.obraNome}</b><br>${obra.empresaNomeFantasia}<br>${obra.obraEndereco}`);
                             markers.push(marker);
-                            console.log(Pin adicionado para: ${obra.obraNome});
+                            console.log(`Pin adicionado para: ${obra.obraNome}`);
                         }
                         // Atraso de 1 segundo para respeitar o limite da API do Nominatim
                         await delay(1000); 
@@ -548,48 +548,6 @@
             // Inicializa o mapa quando a página carrega
             initMap();
         });
-
-  
-document.addEventListener("DOMContentLoaded", function () {
-  fetch("/api/dashboard-dados")
-    .then(res => res.json())
-    .then(dados => {
-      if (Array.isArray(dados)) {
-        console.log("✅ Dados carregados:", dados);
-        // Aqui você chama sua função para gerar os gráficos com os dados
-        gerarGraficos(dados);
-      } else {
-        console.error("❌ Erro ao carregar dados:", dados);
-      }
-    })
-    .catch(err => {
-      console.error("Erro ao buscar dados do dashboard:", err);
-    });
-});
-
-// Sua função que monta os gráficos:
-function gerarGraficos(dados) {
-  // Exemplo:
-  const ctx = document.getElementById("grafico1").getContext("2d");
-  const valores = dados.map(d => d.valor);
-  const labels = dados.map(d => d.nome);
-
-  new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: "Exemplo",
-        data: valores,
-        backgroundColor: "rgba(75, 192, 192, 0.2)",
-        borderColor: "rgba(75, 192, 192, 1)",
-        borderWidth: 1
-      }]
-    }
-  });
-}
-
-
     </script>
 </body>
 </html>
