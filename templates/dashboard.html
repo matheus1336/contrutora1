@@ -342,10 +342,9 @@
                 if (e.target.classList.contains('delete-btn')) {
                     if (confirm(`Tem certeza que deseja excluir a obra "${obra.obraNome}"?`)) {
                         obras = obras.filter(o => String(o.id) !== obraId);
-                        if (Array.isArray(obras)) {
-    localStorage.setItem('obrasParaDashboard', JSON.stringify(obras));
-}
+                        localStorage.setItem('obrasParaDashboard', JSON.stringify(obras));
                         renderTable(obras);
+                        populateFilters(obras); // Atualiza os filtros após exclusão
                     }
                 }
 
@@ -426,11 +425,12 @@
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.message || 'Erro no servidor');
 
-                    alert('Dados salvos no Excel com sucesso! Atualizando dashboard...');
+                    alert('Dashboard atualizado no Google Drive com sucesso!');
                     dashboardGrid.style.display = 'grid';
                     
                     // Atualiza os dados locais para refletir o que foi salvo
                     obras = updatedData;
+                    localStorage.setItem('obrasParaDashboard', JSON.stringify(updatedData));
                     
                     setTimeout(() => {
                         map.invalidateSize();
@@ -438,7 +438,7 @@
                     }, 10);
 
                 } catch (error) {
-                    alert(`Falha ao salvar dados no Excel: ${error.message}`);
+                    alert(`Falha ao atualizar dashboard: ${error.message}`);
                 } finally {
                     button.textContent = 'Salvar e Atualizar Gráficos';
                     button.disabled = false;

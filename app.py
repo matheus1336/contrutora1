@@ -21,6 +21,18 @@ CORS(app, supports_credentials=True, resources={
 })
 
 GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
+DASHBOARD_FILE_NAME = "dashboard_obras.xlsx"
+
+def buscar_arquivo_existente(service, nome_arquivo):
+    """Busca um arquivo existente no Google Drive pela pasta e nome"""
+    try:
+        query = f"name='{nome_arquivo}' and parents in '{GOOGLE_DRIVE_FOLDER_ID}' and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+        return files[0]['id'] if files else None
+    except Exception as e:
+        print(f"Erro ao buscar arquivo existente: {e}")
+        return None
 
 def upload_para_google_drive(df, nome_arquivo):
     try:
@@ -36,28 +48,40 @@ def upload_para_google_drive(df, nome_arquivo):
         # Inicializa o serviço do Drive
         service = build("drive", "v3", credentials=creds)
 
-        # Define metadados do arquivo
-        file_metadata = {
-            "name": nome_arquivo,
-            "parents": [GOOGLE_DRIVE_FOLDER_ID]  # <-- Para salvar na pasta correta
-        }
+        # Verifica se o arquivo já existe
+        arquivo_existente_id = buscar_arquivo_existente(service, nome_arquivo)
+        
         media = MediaFileUpload(
             caminho_excel,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id"
-        ).execute()
+        if arquivo_existente_id:
+            # Atualiza o arquivo existente
+            file = service.files().update(
+                fileId=arquivo_existente_id,
+                media_body=media,
+                fields="id"
+            ).execute()
+            print(f"✅ Arquivo atualizado com sucesso! ID: {file.get('id')}")
+        else:
+            # Cria um novo arquivo
+            file_metadata = {
+                "name": nome_arquivo,
+                "parents": [GOOGLE_DRIVE_FOLDER_ID]
+            }
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields="id"
+            ).execute()
+            print(f"✅ Novo arquivo criado com sucesso! ID: {file.get('id')}")
 
-        print(f"✅ Arquivo enviado com sucesso! ID: {file.get('id')}")
-        return file.get('id')  # <-- Muito importante retornar o ID
+        return file.get('id')
 
     except Exception as e:
         print(f"❌ Erro ao fazer upload no Google Drive: {e}")
-        raise e  # relevanta para o Flask capturar e retornar erro
+        raise e
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -166,9 +190,9 @@ def salvar_dashboard():
         df = pd.DataFrame(dados_recebidos)
         df['id'] = df['id'].astype(str)
 
-        file_id = upload_para_google_drive(df, "dashboard.xlsx")
+        file_id = upload_para_google_drive(df, DASHBOARD_FILE_NAME)
 
-        return jsonify({"success": True, "message": f"Salvo no Google Drive com ID {file_id}"})
+        return jsonify({"success": True, "message": f"Dashboard atualizado no Google Drive com ID {file_id}"})
 
     except Exception as e:
         print(f"Erro ao salvar no Drive: {e}")
