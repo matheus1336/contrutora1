@@ -23,18 +23,14 @@ GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 
 def upload_para_google_drive(df, nome_arquivo):
     try:
-        # CAMINHO PARA O TOKEN GERADO VIA OAUTH
-        TOKEN_PATH = "/etc/secrets/token_drive.pkl"  # ou "token_drive.pkl" localmente
-
-        with open(TOKEN_PATH, "rb") as token_file:
-            creds = pickle.load(token_file)
-
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+        # ✅ Lê o token de acesso do JSON salvo como Secret File
+        with open("/etc/secrets/token.json", "r") as f:
+            creds_info = json.load(f)
+            creds = Credentials.from_authorized_user_info(creds_info)
 
         service = build("drive", "v3", credentials=creds)
 
+        # Converte o DataFrame para Excel em memória
         buffer = io.BytesIO()
         df.to_excel(buffer, index=False, engine="openpyxl")
         buffer.seek(0)
@@ -46,6 +42,7 @@ def upload_para_google_drive(df, nome_arquivo):
         }
 
         media = MediaIoBaseUpload(buffer, mimetype=file_metadata["mimeType"])
+
         uploaded_file = service.files().create(
             body=file_metadata,
             media_body=media,
@@ -55,7 +52,7 @@ def upload_para_google_drive(df, nome_arquivo):
         return uploaded_file.get("id")
 
     except Exception as e:
-        print("Erro ao enviar para o Google Drive:", e)
+        print("❌ Erro ao enviar para o Google Drive:", e)
         raise
 
 @app.route('/')
