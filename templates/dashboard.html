@@ -191,14 +191,14 @@
                 data.forEach(obra => {
                     const row = document.createElement('tr');
                     row.setAttribute('data-id', obra.id);
-                    row.innerHTML = 
+                    row.innerHTML = `
                         <td><button class="delete-btn">Excluir</button></td>
                         <td>
                             <button class="email-btn">E-mail</button>
                             <button class="whatsapp-btn">WhatsApp</button>
                         </td>
-                        <td>${obra.obraNome || ''}</td>
-                        <td>${obra.obraTipo || ''}</td>
+                        <td><input type="text" class="editable" data-field="obraNome" value="${obra.obraNome || ''}"></td>
+                        <td><input type="text" class="editable" data-field="obraTipo" value="${obra.obraTipo || ''}"></td>
                     <td>${obra.obraPadrao || ''}</td>
                     <td>${obra.obraFase || ''}</td>
                     <td>${obra.obraCidade || ''}</td>
