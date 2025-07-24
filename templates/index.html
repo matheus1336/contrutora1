@@ -1,182 +1,391 @@
-from flask import Flask, jsonify, request, render_template
-from flask_cors import CORS
-import requests
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-import os
-import pandas as pd
-import json
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from google.oauth2.credentials import Credentials
-import io
-from google.auth.transport.requests import Request
-import pickle
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestão de Obras</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
 
-app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={
-    r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
-})
+        :root {
+            --bg-color: #1a1c20;
+            --primary-color: #00aaff;
+            --secondary-color: #252830;
+            --text-color: #e0e0e0;
+            --header-color: #1f2125;
+            --border-color: #333742;
+            --hover-color: #2c3038;
+            --success-color: #00c853;
+            --danger-color: #ff3d00;
+        }
 
-GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
-EXCEL_FILE_NAME = "dashboard_obras.xlsx"
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-def upload_para_google_drive(df, nome_arquivo):
-    try:
-        # Carrega credenciais do token
-        with open("/etc/secrets/token_drive.json", "r") as token_file:
-            token_info = json.load(token_file)
-        creds = Credentials.from_authorized_user_info(token_info)
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
 
-        # Inicializa o serviço do Drive
-        service = build("drive", "v3", credentials=creds)
+        h1, h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        h1 { text-align: center; }
 
-        # Verifica se já existe um arquivo com o mesmo nome na pasta
-        query = f"name='{nome_arquivo}' and parents in '{GOOGLE_DRIVE_FOLDER_ID}' and trashed=false"
-        results = service.files().list(q=query, fields="files(id, name)").execute()
-        existing_files = results.get('files', [])
+        .card {
+            background-color: var(--secondary-color);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
 
-        # Salva o DataFrame como arquivo Excel temporário
-        caminho_excel = f"/tmp/{nome_arquivo}"
-        df.to_excel(caminho_excel, index=False)
+        #filters-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+        }
 
-        media = MediaFileUpload(
-            caminho_excel,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        #filters-container label { font-weight: 400; font-size: 0.9em; }
+        #filters-container select, #filters-container input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 8px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 1em;
+        }
 
-        if existing_files:
-            # Atualiza o arquivo existente
-            file_id = existing_files[0]['id']
+        #table-container { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        th {
+            background-color: var(--header-color);
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        tr:hover { background-color: var(--hover-color); }
 
-        print(f"✅ Arquivo enviado com sucesso! ID: {file.get('id')}")
-        return file.get('id')  # <-- Muito importante retornar o ID
+        .button, .dashboard-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .button { background-color: var(--success-color); }
+        .dashboard-btn { background-color: var(--primary-color); }
+        
+        .button:hover, .dashboard-btn:hover { opacity: 0.8; }
 
-    except Exception as e:
-        print(f"❌ Erro ao fazer upload no Google Drive: {e}")
-        raise e  # relevanta para o Flask capturar e retornar erro
-@app.route('/')
-def home():
-    return render_template('index.html')
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: var(--primary-color);
+        }
 
-@app.route('/dashboard.html')
-def dashboard_html():
-    return render_template('dashboard.html')
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-def login():
-    url = "https://api.rededeobras.com.br/api/authorization/api/Authorization/Login"
-    payload = {
-        "login": "integracao_jacuzzi",
-        "password": "<_-54bg5-"
-    }
-    headers = {
-        "accept": "*/*",
-        "Content-Type": "application/json"
-    }
-    resp = requests.post(url, json=payload, headers=headers)
-    resp.raise_for_status()
-    return resp.json()["data"]["token"]
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
 
-def get_real_estate_report(token, type_export=1, limit_days=30):
-    url = "https://api.rededeobras.com.br/export/StandardWorksReport/RealEstate"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "accept": "application/json"
-    }
-    params = {
-        "TypeExport": type_export,
-        "LimitDays": limit_days
-    }
-    resp = requests.get(url, headers=headers, params=params)
-    resp.raise_for_status()
-    return resp.json()
+        .actions-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
 
-@app.route('/api/obras', methods=['GET'])
-def obter_obras():
-    try:
-        print("🔐 Autenticando na API...")
-        token = login()
+        .selected-count {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sistema de Gestão de Obras</h1>
+    <p>Selecione as obras que deseja levar para o dashboard e clique em "Levar para o Dashboard".</p>
 
-        print("📦 Buscando relatório de obras...")
-        response = get_real_estate_report(token)
+    <div id="filters-container" class="card">
+        <label>Cidade: <select id="filterCidade"><option value="">Todas</option></select></label>
+        <label>Término da Obra (Ano/Mês): <input type="text" id="filterTermino" placeholder="Ex: 2024/12"></label>
+        <label>Tipo de Obra: <select id="filterTipo"><option value="">Todos</option></select></label>
+        <label>Padrão da Obra: <select id="filterPadrao"><option value="">Todos</option></select></label>
+        <label>Fase da Obra: <select id="filterFase"><option value="">Todos</option></select></label>
+        <label>Estado: <select id="filterEstado"><option value="">Todos</option></select></label>
+        <label>Empresa: <select id="filterEmpresa"><option value="">Todas</option></select></label>
+        <button id="btnLimparFiltros" class="button" style="grid-column: 1 / -1; justify-self: start;">Limpar Filtros</button>
+    </div>
 
-        obras = response.get("data", [])
-        print(f"✅ Total de obras processadas: {len(obras)}")
-        return jsonify(obras)
+    <div class="actions-container">
+        <button id="load-obras" class="button">Carregar Obras</button>
+        <button id="select-all" class="button" style="display:none;">Selecionar Todas</button>
+        <button id="deselect-all" class="button" style="display:none;">Desmarcar Todas</button>
+        <button id="dashboard-btn" class="dashboard-btn" style="display:none;">Levar para o Dashboard</button>
+        <span id="selected-count" class="selected-count" style="display:none;">0 obras selecionadas</span>
+    </div>
 
-    except requests.HTTPError as e:
-        return jsonify({"error": "HTTP Error", "status_code": e.response.status_code, "message": e.response.text}), e.response.status_code
-    except Exception as e:
-        return jsonify({"error": "Erro inesperado", "message": repr(e)}), 500
+    <div id="table-container" class="card">
+        <div id="loading" class="loading" style="display:none;">Carregando obras...</div>
+        <table id="obras-table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Selecionar</th>
+                    <th>Nome da Obra</th>
+                    <th>Tipo</th>
+                    <th>Padrão</th>
+                    <th>Fase</th>
+                    <th>Cidade</th>
+                    <th>Estado</th>
+                    <th>Endereço</th>
+                    <th>Empresa</th>
+                    <th>Término</th>
+                    <th>Atualização</th>
+                    <th>Site</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- As obras serão inseridas aqui -->
+            </tbody>
+        </table>
+    </div>
 
-@app.route('/api/enviar-email', methods=['POST'])
-def enviar_email():
-    data = request.get_json()
-    destinatario = data.get('email')
-    nome_obra = data.get('obraNome')
-    nome_empresa = data.get('empresaNomeFantasia')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let obras = [];
+            let obrasSelecionadas = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
+            
+            const loadButton = document.getElementById('load-obras');
+            const selectAllButton = document.getElementById('select-all');
+            const deselectAllButton = document.getElementById('deselect-all');
+            const dashboardButton = document.getElementById('dashboard-btn');
+            const selectedCountSpan = document.getElementById('selected-count');
+            const loadingDiv = document.getElementById('loading');
+            const table = document.getElementById('obras-table');
+            const tbody = table.querySelector('tbody');
 
-    if not destinatario:
-        return jsonify({"error": "Nenhum e-mail de destinatário fornecido."}), 400
+            // Função para atualizar contador de selecionadas
+            function updateSelectedCount() {
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+                const count = checkboxes.length;
+                selectedCountSpan.textContent = `${count} obras selecionadas`;
+                selectedCountSpan.style.display = count > 0 ? 'inline' : 'none';
+                dashboardButton.style.display = count > 0 ? 'inline-block' : 'none';
+            }
 
-    MAIL_USERNAME = "matheus.cabrerisso@jacuzzi.com.br"
-    MAIL_PASSWORD = "Grageffe@40197386"
-    MAIL_SERVER = "smtp.office365.com"
-    MAIL_PORT = 587
+            // Função para popular filtros
+            function populateFilters(data) {
+                const cidades = [...new Set(data.map(o => o.obraCidade).filter(Boolean))].sort();
+                const tipos = [...new Set(data.map(o => o.obraTipo).filter(Boolean))].sort();
+                const padroes = [...new Set(data.map(o => o.obraPadrao).filter(Boolean))].sort();
+                const fases = [...new Set(data.map(o => o.obraFase).filter(Boolean))].sort();
+                const estados = [...new Set(data.map(o => o.obraEstado).filter(Boolean))].sort();
+                const empresas = [...new Set(data.map(o => o.empresaNomeFantasia).filter(Boolean))].sort();
 
-    assunto = f"Oportunidade de Parceria para a obra: {nome_obra}"
-    corpo_html = f"""
-    <p>Prezada equipe da {nome_empresa},</p>
-    <p>Gostaríamos de apresentar nossos produtos e soluções que podem agregar grande valor à sua obra <strong>{nome_obra}</strong>.</p>
-    <p>A Jacuzzi é líder de mercado e sinônimo de qualidade e inovação. Seria um prazer agendar uma breve conversa para explorar as possibilidades de parceria.</p>
-    <p>Atenciosamente,</p>
-    <p>Matheus Cabrerisso<br>
-    Jacuzzi</p>
-    """
+                const populateSelect = (id, options) => {
+                    const select = document.getElementById(id);
+                    select.innerHTML = '<option value="">Todas</option>';
+                    options.forEach(option => {
+                        const opt = document.createElement('option');
+                        opt.value = option;
+                        opt.textContent = option;
+                        select.appendChild(opt);
+                    });
+                };
 
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = MAIL_USERNAME
-        msg['To'] = destinatario
-        msg['Subject'] = assunto
-        msg.attach(MIMEText(corpo_html, 'html'))
+                populateSelect('filterCidade', cidades);
+                populateSelect('filterTipo', tipos);
+                populateSelect('filterPadrao', padroes);
+                populateSelect('filterFase', fases);
+                populateSelect('filterEstado', estados);
+                populateSelect('filterEmpresa', empresas);
+            }
 
-        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT)
-        server.starttls()
-        server.login(MAIL_USERNAME, MAIL_PASSWORD)
-        text = msg.as_string()
-        server.sendmail(MAIL_USERNAME, destinatario, text)
-        server.quit()
+            // Função para aplicar filtros
+            function applyFilters() {
+                const filterValues = {
+                    obraCidade: document.getElementById('filterCidade').value,
+                    obraTermino: document.getElementById('filterTermino').value,
+                    obraTipo: document.getElementById('filterTipo').value,
+                    obraPadrao: document.getElementById('filterPadrao').value,
+                    obraFase: document.getElementById('filterFase').value,
+                    obraEstado: document.getElementById('filterEstado').value,
+                    empresaNomeFantasia: document.getElementById('filterEmpresa').value,
+                };
 
-        print(f"E-mail enviado com sucesso para {destinatario}")
-        return jsonify({"success": True, "message": "E-mail enviado com sucesso!"})
+                const rows = tbody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const obraId = row.getAttribute('data-id');
+                    const obra = obras.find(o => String(o.id) === obraId);
+                    let visible = true;
 
-    except Exception as e:
-        print(f"Erro ao enviar e-mail: {e}")
-        return jsonify({"error": "Falha ao enviar e-mail", "message": str(e)}), 500
+                    for (const key in filterValues) {
+                        if (filterValues[key]) {
+                            if (key === 'obraTermino') {
+                                if (!obra[key] || !obra[key].includes(filterValues[key])) {
+                                    visible = false;
+                                }
+                            } else {
+                                if (obra[key] !== filterValues[key]) {
+                                    visible = false;
+                                }
+                            }
+                        }
+                    }
+                    row.style.display = visible ? '' : 'none';
+                });
+                updateSelectedCount();
+            }
 
-@app.route('/api/salvar-dashboard', methods=['POST'])
-def salvar_dashboard():
-    dados_recebidos = request.get_json()
+            // Event listeners para filtros
+            document.querySelectorAll('#filters-container select, #filters-container input').forEach(input => {
+                input.addEventListener('change', applyFilters);
+            });
+            document.getElementById('filterTermino').addEventListener('input', applyFilters);
 
-    try:
-        df = pd.DataFrame(dados_recebidos)
-        df['id'] = df['id'].astype(str)
+            document.getElementById('btnLimparFiltros').addEventListener('click', () => {
+                document.querySelectorAll('#filters-container select, #filters-container input').forEach(input => {
+                    input.value = '';
+                });
+                applyFilters();
+            });
 
-        file_id = upload_para_google_drive(df, "dashboard.xlsx")
+            // Função para renderizar tabela
+            function renderTable(data) {
+                tbody.innerHTML = '';
+                data.forEach(obra => {
+                    const isSelected = obrasSelecionadas.some(selected => String(selected.id) === String(obra.id));
+                    const row = document.createElement('tr');
+                    row.setAttribute('data-id', obra.id);
+                    row.innerHTML = `
+                        <td>
+                            <div class="checkbox-container">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''}>
+                            </div>
+                        </td>
+                        <td>${obra.obraNome || ''}</td>
+                        <td>${obra.obraTipo || ''}</td>
+                        <td>${obra.obraPadrao || ''}</td>
+                        <td>${obra.obraFase || ''}</td>
+                        <td>${obra.obraCidade || ''}</td>
+                        <td>${obra.obraEstado || ''}</td>
+                        <td>${obra.obraEndereco || ''}</td>
+                        <td>${obra.empresaNomeFantasia || ''}</td>
+                        <td>${obra.obraTermino || ''}</td>
+                        <td>${obra.obraAtualizacao || ''}</td>
+                        <td><a href="http://${obra.empresaSite}" target="_blank">Visitar</a></td>
+                    `;
+                    tbody.appendChild(row);
+                });
 
-        return jsonify({"success": True, "message": f"Salvo no Google Drive com ID {file_id}"})
+                // Event listeners para checkboxes
+                tbody.addEventListener('change', function(e) {
+                    if (e.target.type === 'checkbox') {
+                        updateSelectedCount();
+                    }
+                });
 
-    except Exception as e:
-        print(f"Erro ao salvar no Drive: {e}")
-        return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
+                updateSelectedCount();
+            }
 
-@app.route('/health')
-def health():
-    return "OK", 200
+            // Carregar obras
+            loadButton.addEventListener('click', async function() {
+                loadButton.textContent = 'Carregando...';
+                loadButton.disabled = true;
+                loadingDiv.style.display = 'block';
+                table.style.display = 'none';
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+                try {
+                    const response = await fetch('/api/obras');
+                    if (!response.ok) throw new Error('Erro ao carregar obras');
+                    
+                    obras = await response.json();
+                    renderTable(obras);
+                    populateFilters(obras);
+                    
+                    table.style.display = 'table';
+                    selectAllButton.style.display = 'inline-block';
+                    deselectAllButton.style.display = 'inline-block';
+                    
+                } catch (error) {
+                    alert('Erro ao carregar obras: ' + error.message);
+                } finally {
+                    loadingDiv.style.display = 'none';
+                    loadButton.textContent = 'Carregar Obras';
+                    loadButton.disabled = false;
+                }
+            });
+
+            // Selecionar todas
+            selectAllButton.addEventListener('click', function() {
+                const visibleCheckboxes = Array.from(tbody.querySelectorAll('tr:not([style*="display: none"]) input[type="checkbox"]'));
+                visibleCheckboxes.forEach(checkbox => checkbox.checked = true);
+                updateSelectedCount();
+            });
+
+            // Desmarcar todas
+            deselectAllButton.addEventListener('click', function() {
+                const checkboxes = tbody.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => checkbox.checked = false);
+                updateSelectedCount();
+            });
+
+            // Levar para dashboard
+            dashboardButton.addEventListener('click', function() {
+                const checkboxes = tbody.querySelectorAll('input[type="checkbox"]:checked');
+                const novasObras = [];
+                
+                checkboxes.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    const obraId = row.getAttribute('data-id');
+                    const obra = obras.find(o => String(o.id) === obraId);
+                    
+                    // Verifica se a obra já não está selecionada
+                    const jaExiste = obrasSelecionadas.some(selected => String(selected.id) === String(obra.id));
+                    if (!jaExiste) {
+                        novasObras.push(obra);
+                    }
+                });
+
+                // Adiciona as novas obras às já selecionadas
+                obrasSelecionadas = [...obrasSelecionadas, ...novasObras];
+                localStorage.setItem('obrasParaDashboard', JSON.stringify(obrasSelecionadas));
+                
+                alert(`${novasObras.length} nova(s) obra(s) adicionada(s) ao dashboard! Total: ${obrasSelecionadas.length} obras.`);
+                window.location.href = '/dashboard.html';
+            });
+        });
+    </script>
+</body>
+</html>
