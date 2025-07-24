@@ -24,38 +24,40 @@ GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
 
 def upload_para_google_drive(df, nome_arquivo):
     try:
-        # ✅ Lê o token de acesso do JSON salvo como Secret File
-        with open("/etc/secrets/token.json", "r") as f:
-            creds_info = json.load(f)
-            creds = Credentials.from_authorized_user_info(creds_info)
+        # Salva o DataFrame como arquivo Excel temporário
+        caminho_excel = f"/tmp/{nome_arquivo}"
+        df.to_excel(caminho_excel, index=False)
 
+        # Carrega credenciais do token
+        with open("token_drive.json", "r") as token_file:
+            token_info = json.load(token_file)
+        creds = Credentials.from_authorized_user_info(token_info)
+
+        # Inicializa o serviço do Drive
         service = build("drive", "v3", credentials=creds)
 
-        # Converte o DataFrame para Excel em memória
-        buffer = io.BytesIO()
-        df.to_excel(buffer, index=False, engine="openpyxl")
-        buffer.seek(0)
-
+        # Define metadados do arquivo
         file_metadata = {
             "name": nome_arquivo,
-            "parents": [GOOGLE_DRIVE_FOLDER_ID],
-            "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "parents": [GOOGLE_DRIVE_FOLDER_ID]  # <-- Para salvar na pasta correta
         }
+        media = MediaFileUpload(
+            caminho_excel,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-        media = MediaIoBaseUpload(buffer, mimetype=file_metadata["mimeType"])
-
-        uploaded_file = service.files().create(
+        file = service.files().create(
             body=file_metadata,
             media_body=media,
             fields="id"
         ).execute()
 
-        return uploaded_file.get("id")
+        print(f"✅ Arquivo enviado com sucesso! ID: {file.get('id')}")
+        return file.get('id')  # <-- Muito importante retornar o ID
 
     except Exception as e:
-        print("❌ Erro ao enviar para o Google Drive:", e)
-        raise
-
+        print(f"❌ Erro ao fazer upload no Google Drive: {e}")
+        raise e  # relevanta para o Flask capturar e retornar erro
 @app.route('/')
 def home():
     return render_template('index.html')
