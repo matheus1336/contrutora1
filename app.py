@@ -112,53 +112,6 @@ def obter_obras():
     except Exception as e:
         return jsonify({"error": "Erro inesperado", "message": repr(e)}), 500
 
-
-@app.route("/api/dashboard-dados", methods=["GET"])
-def carregar_dados_dashboard():
-    try:
-        # Carrega credenciais
-        with open("/etc/secrets/token_drive.json", "r") as token_file:
-            token_info = json.load(token_file)
-        creds = Credentials.from_authorized_user_info(token_info)
-        service = build("drive", "v3", credentials=creds)
-
-        # Encontra o arquivo
-        response = service.files().list(
-            q=f"name = 'dashboard.xlsx' and '{GOOGLE_DRIVE_FOLDER_ID}' in parents",
-            spaces='drive',
-            fields="files(id, name)",
-            pageSize=1
-        ).execute()
-        files = response.get('files', [])
-
-        if not files:
-            return jsonify({"error": "Arquivo não encontrado"}), 404
-
-        file_id = files[0]['id']
-
-        # Baixa o conteúdo
-        from googleapiclient.http import MediaIoBaseDownload
-        import io
-
-        request = service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-
-        fh.seek(0)
-        df = pd.read_excel(fh)
-        dados_json = df.to_dict(orient="records")
-
-        return jsonify(dados_json)
-
-    except Exception as e:
-        print(f"Erro ao carregar dashboard: {e}")
-        return jsonify({"error": "Erro ao carregar dashboard", "message": str(e)}), 500
-
-
 @app.route('/api/enviar-email', methods=['POST'])
 def enviar_email():
     data = request.get_json()
