@@ -875,11 +875,13 @@
                         
                         // Atualiza localStorage para manter sincronizado
                         localStorage.setItem('obrasParaDashboard', JSON.stringify(obras));
+                        localStorage.setItem('lastSyncTime', Date.now().toString());
                         
                         // Renderiza a tabela e atualiza interface
                         renderTable(obras);
                         populateFilters(obras);
                         updateStats();
+                        return true;
                     } else {
                         console.log('📄 Nenhum dado encontrado no Google Drive, usando localStorage');
                         obras = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
@@ -888,6 +890,7 @@
                             populateFilters(obras);
                             updateStats();
                         }
+                        return false;
                     }
                 } catch (error) {
                     console.error('❌ Erro ao carregar dados do Google Drive:', error);
@@ -898,11 +901,84 @@
                         populateFilters(obras);
                         updateStats();
                     }
+                    return false;
                 }
+            }
+
+            // Função para sincronização automática
+            async function sincronizacaoAutomatica() {
+                const lastSync = localStorage.getItem('lastSyncTime');
+                const agora = Date.now();
+                const INTERVALO_SYNC = 30000; // 30 segundos
+
+                if (!lastSync || (agora - parseInt(lastSync)) > INTERVALO_SYNC) {
+                    try {
+                        const response = await fetch('/api/carregar-dashboard');
+                        const result = await response.json();
+                        
+                        if (response.ok && result.data && result.data.length > 0) {
+                            const dadosNovos = JSON.stringify(result.data);
+                            const dadosAtuais = localStorage.getItem('obrasParaDashboard');
+                            
+                            // Só atualiza se os dados mudaram
+                            if (dadosNovos !== dadosAtuais) {
+                                console.log('🔄 Sincronizando novos dados do Google Drive...');
+                                obras = result.data;
+                                localStorage.setItem('obrasParaDashboard', dadosNovos);
+                                localStorage.setItem('lastSyncTime', agora.toString());
+                                
+                                renderTable(obras);
+                                populateFilters(obras);
+                                updateStats();
+                                
+                                // Mostra notificação visual
+                                mostrarNotificacaoSync();
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Erro na sincronização automática:', error);
+                    }
+                }
+            }
+
+            // Função para mostrar notificação de sincronização
+            function mostrarNotificacaoSync() {
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                    color: white;
+                    padding: 1rem 2rem;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    z-index: 10000;
+                    font-weight: 500;
+                    animation: slideIn 0.3s ease;
+                `;
+                notification.innerHTML = '<i class="fas fa-sync-alt"></i> Dados sincronizados!';
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => notification.remove(), 300);
+                }, 2000);
             }
 
             // Carrega dados automaticamente ao inicializar
             await carregarDadosAutomaticamente();
+
+            // Inicia sincronização automática a cada 30 segundos
+            setInterval(sincronizacaoAutomatica, 30000);
+            
+            // Também sincroniza quando a aba ganha foco (usuário volta ao navegador)
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    sincronizacaoAutomatica();
+                }
+            });
 
             // Define os cabeçalhos da tabela de edição
             const headers = [
