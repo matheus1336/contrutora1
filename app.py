@@ -21,31 +21,70 @@ CORS(app, supports_credentials=True, resources={
 })
 
 GOOGLE_SHEETS_ID = "1KimIySvsM_jPbouL8GzeZut-jXEioACe"
-SHEET_NAME = "Sheet1"  # ou o nome da aba que você quer usar
+SHEET_NAME = "Planilha1"  # Nome padrão do Google Sheets em português
+
+def get_google_credentials():
+    """Obtém credenciais do Google usando Service Account"""
+    try:
+        # Primeiro tenta usar as credenciais do arquivo local
+        with open("credenciais_drive.json", "r") as cred_file:
+            service_account_info = json.load(cred_file)
+        
+        creds = service_account.Credentials.from_service_account_info(
+            service_account_info,
+            scopes=[
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+        )
+        return creds
+    except Exception as e:
+        print(f"❌ Erro ao carregar credenciais: {e}")
+        return None
 
 def ler_dados_do_google_sheets():
     """Lê dados existentes do Google Sheets"""
     try:
-        # Carrega credenciais do token
-        with open("/etc/secrets/token_drive.json", "r") as token_file:
-            token_info = json.load(token_file)
-        creds = Credentials.from_authorized_user_info(token_info)
+        creds = get_google_credentials()
+        if not creds:
+            raise Exception("Não foi possível obter credenciais do Google")
 
         # Inicializa o serviço do Sheets
         service = build("sheets", "v4", credentials=creds)
 
-        # Lê dados da planilha
-        range_name = f"{SHEET_NAME}!A:Z"  # Lê todas as colunas
-        result = service.spreadsheets().values().get(
-            spreadsheetId=GOOGLE_SHEETS_ID,
-            range=range_name
-        ).execute()
-        
-        values = result.get('values', [])
-        
-        if not values:
-            print("📄 Nenhum dado encontrado no Google Sheets")
-            return []
+        # Primeiro verifica se a planilha existe e tem dados
+        try:
+            range_name = f"{SHEET_NAME}!A:Z"  # Lê todas as colunas
+            result = service.spreadsheets().values().get(
+                spreadsheetId=GOOGLE_SHEETS_ID,
+                range=range_name
+            ).execute()
+            
+            values = result.get('values', [])
+            
+            if not values or len(values) <= 1:
+                print("📄 Planilha vazia ou apenas com cabeçalho. Criando estrutura inicial...")
+                # Cria cabeçalho padrão se não existir
+                criar_cabecalho_inicial(service)
+                return []
+                
+        except Exception as api_error:
+            print(f"⚠️ Erro ao acessar planilha (pode não existir): {api_error}")
+            # Tenta criar a planilha ou usar uma aba diferente
+            try:
+                # Tenta com o nome "Sheet1" (inglês)
+                range_name = "Sheet1!A:Z"
+                result = service.spreadsheets().values().get(
+                    spreadsheetId=GOOGLE_SHEETS_ID,
+                    range=range_name
+                ).execute()
+                values = result.get('values', [])
+                global SHEET_NAME
+                SHEET_NAME = "Sheet1"  # Atualiza o nome da aba
+                print("✅ Usando aba 'Sheet1'")
+            except:
+                print("📄 Nenhum dado encontrado no Google Sheets")
+                return []
         
         # Converte para lista de dicionários usando a primeira linha como cabeçalho
         headers = values[0]
@@ -70,10 +109,9 @@ def ler_dados_do_google_sheets():
 
 def salvar_dados_no_google_sheets(df):
     try:
-        # Carrega credenciais do token
-        with open("/etc/secrets/token_drive.json", "r") as token_file:
-            token_info = json.load(token_file)
-        creds = Credentials.from_authorized_user_info(token_info)
+        creds = get_google_credentials()
+        if not creds:
+            raise Exception("Não foi possível obter credenciais do Google")
 
         # Inicializa o serviço do Sheets
         service = build("sheets", "v4", credentials=creds)
@@ -106,6 +144,34 @@ def salvar_dados_no_google_sheets(df):
     except Exception as e:
         print(f"❌ Erro ao salvar no Google Sheets: {e}")
         raise e
+
+def criar_cabecalho_inicial(service):
+    """Cria cabeçalho inicial na planilha se ela estiver vazia"""
+    try:
+        cabecalho = [
+            'id', 'obraNome', 'obraTipo', 'obraPadrao', 'obraFase', 'obraCidade', 
+            'obraEstado', 'obraEndereco', 'empresaNomeFantasia', 'obraTermino', 
+            'obraAtualizacao', 'empresaSite', 'empresaContato1Email', 'empresaContato1Telefone1',
+            'empresaTelefone1', 'buyerName', 'buyerPhone', 'buyerEmail', 'regional', 
+            'segmento', 'qtdeProduto', 'produtoDesejado', 'representante', 'precoProduto', 
+            'status', 'motivo'
+        ]
+        
+        body = {
+            'values': [cabecalho]
+        }
+        
+        service.spreadsheets().values().update(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range=f"{SHEET_NAME}!A1",
+            valueInputOption='RAW',
+            body=body
+        ).execute()
+        
+        print("✅ Cabeçalho inicial criado na planilha")
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar cabeçalho inicial: {e}")
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -258,6 +324,32 @@ def salvar_contato_comprador():
         print(f"Erro ao salvar contato do comprador: {e}")
         return jsonify({
             "error": "Falha ao salvar contato do comprador", 
+            "message": str(e)
+        }), 500
+
+@app.route('/api/test-sheets', methods=['GET'])
+def test_sheets_connection():
+    """Endpoint para testar conexão com Google Sheets"""
+    try:
+        creds = get_google_credentials()
+        if not creds:
+            return jsonify({"error": "Credenciais não encontradas"}), 500
+            
+        service = build("sheets", "v4", credentials=creds)
+        
+        # Tenta acessar informações básicas da planilha
+        sheet_metadata = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_ID).execute()
+        sheet_title = sheet_metadata.get('properties', {}).get('title', 'Título não encontrado')
+        
+        return jsonify({
+            "success": True,
+            "message": f"Conexão bem-sucedida com a planilha: {sheet_title}",
+            "sheets_id": GOOGLE_SHEETS_ID
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Falha na conexão com Google Sheets",
             "message": str(e)
         }), 500
 
