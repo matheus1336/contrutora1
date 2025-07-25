@@ -34,6 +34,48 @@ def buscar_arquivo_existente(service, nome_arquivo):
         print(f"Erro ao buscar arquivo existente: {e}")
         return None
 
+def ler_dados_do_google_drive(nome_arquivo):
+    """Lê dados existentes do Google Drive"""
+    try:
+        # Carrega credenciais do token
+        with open("/etc/secrets/token_drive.json", "r") as token_file:
+            token_info = json.load(token_file)
+        creds = Credentials.from_authorized_user_info(token_info)
+
+        # Inicializa o serviço do Drive
+        service = build("drive", "v3", credentials=creds)
+
+        # Busca o arquivo existente
+        arquivo_id = buscar_arquivo_existente(service, nome_arquivo)
+        
+        if not arquivo_id:
+            print(f"📄 Arquivo {nome_arquivo} não encontrado no Google Drive")
+            return []
+
+        # Faz download do arquivo
+        request = service.files().get_media(fileId=arquivo_id)
+        file_content = io.BytesIO()
+        
+        import googleapiclient.http
+        downloader = googleapiclient.http.MediaIoBaseDownload(file_content, request)
+        done = False
+        
+        while done is False:
+            status, done = downloader.next_chunk()
+        
+        # Lê o conteúdo como DataFrame
+        file_content.seek(0)
+        df = pd.read_excel(file_content)
+        
+        # Converte para lista de dicionários
+        dados = df.to_dict('records')
+        print(f"✅ {len(dados)} registros carregados do Google Drive")
+        return dados
+
+    except Exception as e:
+        print(f"❌ Erro ao ler dados do Google Drive: {e}")
+        return []
+
 def upload_para_google_drive(df, nome_arquivo):
     try:
         # Salva o DataFrame como arquivo Excel temporário
@@ -197,6 +239,23 @@ def salvar_dashboard():
     except Exception as e:
         print(f"Erro ao salvar no Drive: {e}")
         return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
+
+@app.route('/api/carregar-dashboard', methods=['GET'])
+def carregar_dashboard():
+    """Carrega dados existentes do dashboard do Google Drive"""
+    try:
+        dados = ler_dados_do_google_drive(DASHBOARD_FILE_NAME)
+        return jsonify({
+            "success": True,
+            "data": dados,
+            "message": f"{len(dados)} registros carregados com sucesso"
+        })
+    except Exception as e:
+        print(f"Erro ao carregar dashboard: {e}")
+        return jsonify({
+            "error": "Falha ao carregar dados do dashboard",
+            "message": str(e)
+        }), 500
 
 @app.route('/api/salvar-contato-comprador', methods=['POST'])
 def salvar_contato_comprador():
