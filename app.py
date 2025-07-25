@@ -20,167 +20,68 @@ CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
 })
 
-GOOGLE_SHEETS_ID = "1KimIySvsM_jPbouL8GzeZut-jXEioACe"
-SHEET_NAME = "Planilha1"  # Nome padrão do Google Sheets em português
+GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
+DASHBOARD_FILE_NAME = "dashboard_obras.xlsx"
 
-def get_google_credentials():
-    """Obtém credenciais do Google usando Service Account"""
+def buscar_arquivo_existente(service, nome_arquivo):
+    """Busca um arquivo existente no Google Drive pela pasta e nome"""
     try:
-        # Primeiro tenta usar as credenciais do arquivo local
-        with open("credenciais_drive.json", "r") as cred_file:
-            service_account_info = json.load(cred_file)
-        
-        # Corrige possíveis problemas na chave privada
-        if 'private_key' in service_account_info:
-            service_account_info['private_key'] = service_account_info['private_key'].replace('\\n', '\n')
-        
-        creds = service_account.Credentials.from_service_account_info(
-            service_account_info,
-            scopes=[
-                'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive'
-            ]
-        )
-        
-        # Refresh token se necessário
-        if creds.expired:
-            creds.refresh(Request())
-            
-        return creds
+        query = f"name='{nome_arquivo}' and parents in '{GOOGLE_DRIVE_FOLDER_ID}' and trashed=false"
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+        return files[0]['id'] if files else None
     except Exception as e:
-        print(f"❌ Erro ao carregar credenciais: {e}")
+        print(f"Erro ao buscar arquivo existente: {e}")
         return None
 
-def ler_dados_do_google_sheets():
-    """Lê dados existentes do Google Sheets"""
-    global SHEET_NAME
+def upload_para_google_drive(df, nome_arquivo):
     try:
-        creds = get_google_credentials()
-        if not creds:
-            raise Exception("Não foi possível obter credenciais do Google")
+        # Salva o DataFrame como arquivo Excel temporário
+        caminho_excel = f"/tmp/{nome_arquivo}"
+        df.to_excel(caminho_excel, index=False)
 
-        # Inicializa o serviço do Sheets
-        service = build("sheets", "v4", credentials=creds)
+        # Carrega credenciais do token
+        with open("/etc/secrets/token_drive.json", "r") as token_file:
+            token_info = json.load(token_file)
+        creds = Credentials.from_authorized_user_info(token_info)
 
-        # Primeiro verifica se a planilha existe e tem dados
-        try:
-            range_name = f"{SHEET_NAME}!A:Z"  # Lê todas as colunas
-            result = service.spreadsheets().values().get(
-                spreadsheetId=GOOGLE_SHEETS_ID,
-                range=range_name
-            ).execute()
-            
-            values = result.get('values', [])
-            
-            if not values or len(values) <= 1:
-                print("📄 Planilha vazia ou apenas com cabeçalho. Criando estrutura inicial...")
-                # Cria cabeçalho padrão se não existir
-                criar_cabecalho_inicial(service)
-                return []
-                
-        except Exception as api_error:
-            print(f"⚠️ Erro ao acessar planilha (pode não existir): {api_error}")
-            # Tenta criar a planilha ou usar uma aba diferente
-            try:
-                # Tenta com o nome "Sheet1" (inglês)
-                range_name = "Sheet1!A:Z"
-                result = service.spreadsheets().values().get(
-                    spreadsheetId=GOOGLE_SHEETS_ID,
-                    range=range_name
-                ).execute()
-                values = result.get('values', [])
-                SHEET_NAME = "Sheet1"  # Atualiza o nome da aba
-                print("✅ Usando aba 'Sheet1'")
-            except:
-                print("📄 Nenhum dado encontrado no Google Sheets")
-                return []
+        # Inicializa o serviço do Drive
+        service = build("drive", "v3", credentials=creds)
+
+        # Verifica se o arquivo já existe
+        arquivo_existente_id = buscar_arquivo_existente(service, nome_arquivo)
         
-        # Converte para lista de dicionários usando a primeira linha como cabeçalho
-        headers = values[0]
-        dados = []
-        
-        for row in values[1:]:
-            # Garante que a linha tenha o mesmo número de colunas que o cabeçalho
-            while len(row) < len(headers):
-                row.append('')
-            
-            row_dict = {}
-            for i, header in enumerate(headers):
-                row_dict[header] = row[i] if i < len(row) else ''
-            dados.append(row_dict)
-        
-        print(f"✅ {len(dados)} registros carregados do Google Sheets")
-        return dados
-
-    except Exception as e:
-        print(f"❌ Erro ao ler dados do Google Sheets: {e}")
-        return []
-
-def salvar_dados_no_google_sheets(df):
-    try:
-        creds = get_google_credentials()
-        if not creds:
-            raise Exception("Não foi possível obter credenciais do Google")
-
-        # Inicializa o serviço do Sheets
-        service = build("sheets", "v4", credentials=creds)
-
-        # Converte DataFrame para lista de listas
-        values = [df.columns.tolist()] + df.values.tolist()
-
-        # Limpa a planilha primeiro
-        clear_request = service.spreadsheets().values().clear(
-            spreadsheetId=GOOGLE_SHEETS_ID,
-            range=f"{SHEET_NAME}!A:Z"
+        media = MediaFileUpload(
+            caminho_excel,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        clear_request.execute()
 
-        # Escreve os novos dados
-        body = {
-            'values': values
-        }
-        
-        result = service.spreadsheets().values().update(
-            spreadsheetId=GOOGLE_SHEETS_ID,
-            range=f"{SHEET_NAME}!A1",
-            valueInputOption='RAW',
-            body=body
-        ).execute()
+        if arquivo_existente_id:
+            # Atualiza o arquivo existente
+            file = service.files().update(
+                fileId=arquivo_existente_id,
+                media_body=media,
+                fields="id"
+            ).execute()
+            print(f"✅ Arquivo atualizado com sucesso! ID: {file.get('id')}")
+        else:
+            # Cria um novo arquivo
+            file_metadata = {
+                "name": nome_arquivo,
+                "parents": [GOOGLE_DRIVE_FOLDER_ID]
+            }
+            file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields="id"
+            ).execute()
+            print(f"✅ Novo arquivo criado com sucesso! ID: {file.get('id')}")
 
-        print(f"✅ Planilha atualizada com sucesso! {result.get('updatedCells')} células atualizadas")
-        return GOOGLE_SHEETS_ID
+        return file.get('id')
 
     except Exception as e:
-        print(f"❌ Erro ao salvar no Google Sheets: {e}")
+        print(f"❌ Erro ao fazer upload no Google Drive: {e}")
         raise e
-
-def criar_cabecalho_inicial(service):
-    """Cria cabeçalho inicial na planilha se ela estiver vazia"""
-    try:
-        cabecalho = [
-            'id', 'obraNome', 'obraTipo', 'obraPadrao', 'obraFase', 'obraCidade', 
-            'obraEstado', 'obraEndereco', 'empresaNomeFantasia', 'obraTermino', 
-            'obraAtualizacao', 'empresaSite', 'empresaContato1Email', 'empresaContato1Telefone1',
-            'empresaTelefone1', 'buyerName', 'buyerPhone', 'buyerEmail', 'regional', 
-            'segmento', 'qtdeProduto', 'produtoDesejado', 'representante', 'precoProduto', 
-            'status', 'motivo'
-        ]
-        
-        body = {
-            'values': [cabecalho]
-        }
-        
-        service.spreadsheets().values().update(
-            spreadsheetId=GOOGLE_SHEETS_ID,
-            range=f"{SHEET_NAME}!A1",
-            valueInputOption='RAW',
-            body=body
-        ).execute()
-        
-        print("✅ Cabeçalho inicial criado na planilha")
-        
-    except Exception as e:
-        print(f"❌ Erro ao criar cabeçalho inicial: {e}")
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -289,30 +190,13 @@ def salvar_dashboard():
         df = pd.DataFrame(dados_recebidos)
         df['id'] = df['id'].astype(str)
 
-        sheets_id = salvar_dados_no_google_sheets(df)
+        file_id = upload_para_google_drive(df, DASHBOARD_FILE_NAME)
 
-        return jsonify({"success": True, "message": f"Dashboard atualizado no Google Sheets com ID {sheets_id}"})
+        return jsonify({"success": True, "message": f"Dashboard atualizado no Google Drive com ID {file_id}"})
 
     except Exception as e:
-        print(f"Erro ao salvar no Sheets: {e}")
-        return jsonify({"error": "Falha ao salvar no Google Sheets", "message": str(e)}), 500
-
-@app.route('/api/carregar-dashboard', methods=['GET'])
-def carregar_dashboard():
-    """Carrega dados existentes do dashboard do Google Sheets"""
-    try:
-        dados = ler_dados_do_google_sheets()
-        return jsonify({
-            "success": True,
-            "data": dados,
-            "message": f"{len(dados)} registros carregados com sucesso"
-        })
-    except Exception as e:
-        print(f"Erro ao carregar dashboard: {e}")
-        return jsonify({
-            "error": "Falha ao carregar dados do dashboard",
-            "message": str(e)
-        }), 500
+        print(f"Erro ao salvar no Drive: {e}")
+        return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
 
 @app.route('/api/salvar-contato-comprador', methods=['POST'])
 def salvar_contato_comprador():
@@ -336,60 +220,9 @@ def salvar_contato_comprador():
             "message": str(e)
         }), 500
 
-@app.route('/api/test-sheets', methods=['GET'])
-def test_sheets_connection():
-    """Endpoint para testar conexão com Google Sheets"""
-    try:
-        creds = get_google_credentials()
-        if not creds:
-            return jsonify({"error": "Credenciais não encontradas"}), 500
-            
-        service = build("sheets", "v4", credentials=creds)
-        
-        # Tenta acessar informações básicas da planilha
-        sheet_metadata = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_ID).execute()
-        sheet_title = sheet_metadata.get('properties', {}).get('title', 'Título não encontrado')
-        
-        return jsonify({
-            "success": True,
-            "message": f"Conexão bem-sucedida com a planilha: {sheet_title}",
-            "sheets_id": GOOGLE_SHEETS_ID
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "error": "Falha na conexão com Google Sheets",
-            "message": str(e)
-        }), 500
-
 @app.route('/health')
 def health():
     return "OK", 200
-
-@app.route('/api/check-connection', methods=['GET'])
-def check_connection():
-    """Verifica se a conexão com Google Sheets está funcionando"""
-    try:
-        creds = get_google_credentials()
-        if not creds:
-            return jsonify({"connected": False, "error": "Credenciais inválidas"}), 200
-            
-        service = build("sheets", "v4", credentials=creds)
-        
-        # Testa acesso básico à planilha
-        sheet_metadata = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_ID).execute()
-        
-        return jsonify({
-            "connected": True,
-            "sheet_title": sheet_metadata.get('properties', {}).get('title', 'Título não encontrado'),
-            "sheets_id": GOOGLE_SHEETS_ID
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "connected": False, 
-            "error": str(e)
-        }), 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
