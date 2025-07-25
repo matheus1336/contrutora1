@@ -30,6 +30,10 @@ def get_google_credentials():
         with open("credenciais_drive.json", "r") as cred_file:
             service_account_info = json.load(cred_file)
         
+        # Corrige possíveis problemas na chave privada
+        if 'private_key' in service_account_info:
+            service_account_info['private_key'] = service_account_info['private_key'].replace('\\n', '\n')
+        
         creds = service_account.Credentials.from_service_account_info(
             service_account_info,
             scopes=[
@@ -37,6 +41,11 @@ def get_google_credentials():
                 'https://www.googleapis.com/auth/drive'
             ]
         )
+        
+        # Refresh token se necessário
+        if creds.expired:
+            creds.refresh(Request())
+            
         return creds
     except Exception as e:
         print(f"❌ Erro ao carregar credenciais: {e}")
@@ -356,6 +365,31 @@ def test_sheets_connection():
 @app.route('/health')
 def health():
     return "OK", 200
+
+@app.route('/api/check-connection', methods=['GET'])
+def check_connection():
+    """Verifica se a conexão com Google Sheets está funcionando"""
+    try:
+        creds = get_google_credentials()
+        if not creds:
+            return jsonify({"connected": False, "error": "Credenciais inválidas"}), 200
+            
+        service = build("sheets", "v4", credentials=creds)
+        
+        # Testa acesso básico à planilha
+        sheet_metadata = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_ID).execute()
+        
+        return jsonify({
+            "connected": True,
+            "sheet_title": sheet_metadata.get('properties', {}).get('title', 'Título não encontrado'),
+            "sheets_id": GOOGLE_SHEETS_ID
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "connected": False, 
+            "error": str(e)
+        }), 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
