@@ -20,109 +20,91 @@ CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["https://contrutora1-2.onrender.com"]}
 })
 
-GOOGLE_DRIVE_FOLDER_ID = "1k1kAtBU1Q8t85pfpRmN-338H2u3N64Zf"
-DASHBOARD_FILE_NAME = "dashboard_obras.xlsx"
+GOOGLE_SHEETS_ID = "1KimIySvsM_jPbouL8GzeZut-jXEioACe"
+SHEET_NAME = "Sheet1"  # ou o nome da aba que você quer usar
 
-def buscar_arquivo_existente(service, nome_arquivo):
-    """Busca um arquivo existente no Google Drive pela pasta e nome"""
-    try:
-        query = f"name='{nome_arquivo}' and parents in '{GOOGLE_DRIVE_FOLDER_ID}' and trashed=false"
-        results = service.files().list(q=query, fields="files(id, name)").execute()
-        files = results.get('files', [])
-        return files[0]['id'] if files else None
-    except Exception as e:
-        print(f"Erro ao buscar arquivo existente: {e}")
-        return None
-
-def ler_dados_do_google_drive(nome_arquivo):
-    """Lê dados existentes do Google Drive"""
+def ler_dados_do_google_sheets():
+    """Lê dados existentes do Google Sheets"""
     try:
         # Carrega credenciais do token
         with open("/etc/secrets/token_drive.json", "r") as token_file:
             token_info = json.load(token_file)
         creds = Credentials.from_authorized_user_info(token_info)
 
-        # Inicializa o serviço do Drive
-        service = build("drive", "v3", credentials=creds)
+        # Inicializa o serviço do Sheets
+        service = build("sheets", "v4", credentials=creds)
 
-        # Busca o arquivo existente
-        arquivo_id = buscar_arquivo_existente(service, nome_arquivo)
+        # Lê dados da planilha
+        range_name = f"{SHEET_NAME}!A:Z"  # Lê todas as colunas
+        result = service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range=range_name
+        ).execute()
         
-        if not arquivo_id:
-            print(f"📄 Arquivo {nome_arquivo} não encontrado no Google Drive")
+        values = result.get('values', [])
+        
+        if not values:
+            print("📄 Nenhum dado encontrado no Google Sheets")
             return []
-
-        # Faz download do arquivo
-        request = service.files().get_media(fileId=arquivo_id)
-        file_content = io.BytesIO()
         
-        import googleapiclient.http
-        downloader = googleapiclient.http.MediaIoBaseDownload(file_content, request)
-        done = False
+        # Converte para lista de dicionários usando a primeira linha como cabeçalho
+        headers = values[0]
+        dados = []
         
-        while done is False:
-            status, done = downloader.next_chunk()
+        for row in values[1:]:
+            # Garante que a linha tenha o mesmo número de colunas que o cabeçalho
+            while len(row) < len(headers):
+                row.append('')
+            
+            row_dict = {}
+            for i, header in enumerate(headers):
+                row_dict[header] = row[i] if i < len(row) else ''
+            dados.append(row_dict)
         
-        # Lê o conteúdo como DataFrame
-        file_content.seek(0)
-        df = pd.read_excel(file_content)
-        
-        # Converte para lista de dicionários
-        dados = df.to_dict('records')
-        print(f"✅ {len(dados)} registros carregados do Google Drive")
+        print(f"✅ {len(dados)} registros carregados do Google Sheets")
         return dados
 
     except Exception as e:
-        print(f"❌ Erro ao ler dados do Google Drive: {e}")
+        print(f"❌ Erro ao ler dados do Google Sheets: {e}")
         return []
 
-def upload_para_google_drive(df, nome_arquivo):
+def salvar_dados_no_google_sheets(df):
     try:
-        # Salva o DataFrame como arquivo Excel temporário
-        caminho_excel = f"/tmp/{nome_arquivo}"
-        df.to_excel(caminho_excel, index=False)
-
         # Carrega credenciais do token
         with open("/etc/secrets/token_drive.json", "r") as token_file:
             token_info = json.load(token_file)
         creds = Credentials.from_authorized_user_info(token_info)
 
-        # Inicializa o serviço do Drive
-        service = build("drive", "v3", credentials=creds)
+        # Inicializa o serviço do Sheets
+        service = build("sheets", "v4", credentials=creds)
 
-        # Verifica se o arquivo já existe
-        arquivo_existente_id = buscar_arquivo_existente(service, nome_arquivo)
-        
-        media = MediaFileUpload(
-            caminho_excel,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        # Converte DataFrame para lista de listas
+        values = [df.columns.tolist()] + df.values.tolist()
+
+        # Limpa a planilha primeiro
+        clear_request = service.spreadsheets().values().clear(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range=f"{SHEET_NAME}!A:Z"
         )
+        clear_request.execute()
 
-        if arquivo_existente_id:
-            # Atualiza o arquivo existente
-            file = service.files().update(
-                fileId=arquivo_existente_id,
-                media_body=media,
-                fields="id"
-            ).execute()
-            print(f"✅ Arquivo atualizado com sucesso! ID: {file.get('id')}")
-        else:
-            # Cria um novo arquivo
-            file_metadata = {
-                "name": nome_arquivo,
-                "parents": [GOOGLE_DRIVE_FOLDER_ID]
-            }
-            file = service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields="id"
-            ).execute()
-            print(f"✅ Novo arquivo criado com sucesso! ID: {file.get('id')}")
+        # Escreve os novos dados
+        body = {
+            'values': values
+        }
+        
+        result = service.spreadsheets().values().update(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range=f"{SHEET_NAME}!A1",
+            valueInputOption='RAW',
+            body=body
+        ).execute()
 
-        return file.get('id')
+        print(f"✅ Planilha atualizada com sucesso! {result.get('updatedCells')} células atualizadas")
+        return GOOGLE_SHEETS_ID
 
     except Exception as e:
-        print(f"❌ Erro ao fazer upload no Google Drive: {e}")
+        print(f"❌ Erro ao salvar no Google Sheets: {e}")
         raise e
 @app.route('/')
 def home():
@@ -232,19 +214,19 @@ def salvar_dashboard():
         df = pd.DataFrame(dados_recebidos)
         df['id'] = df['id'].astype(str)
 
-        file_id = upload_para_google_drive(df, DASHBOARD_FILE_NAME)
+        sheets_id = salvar_dados_no_google_sheets(df)
 
-        return jsonify({"success": True, "message": f"Dashboard atualizado no Google Drive com ID {file_id}"})
+        return jsonify({"success": True, "message": f"Dashboard atualizado no Google Sheets com ID {sheets_id}"})
 
     except Exception as e:
-        print(f"Erro ao salvar no Drive: {e}")
-        return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
+        print(f"Erro ao salvar no Sheets: {e}")
+        return jsonify({"error": "Falha ao salvar no Google Sheets", "message": str(e)}), 500
 
 @app.route('/api/carregar-dashboard', methods=['GET'])
 def carregar_dashboard():
-    """Carrega dados existentes do dashboard do Google Drive"""
+    """Carrega dados existentes do dashboard do Google Sheets"""
     try:
-        dados = ler_dados_do_google_drive(DASHBOARD_FILE_NAME)
+        dados = ler_dados_do_google_sheets()
         return jsonify({
             "success": True,
             "data": dados,
