@@ -44,6 +44,7 @@ def get_google_credentials():
 
 def ler_dados_do_google_sheets():
     """Lê dados existentes do Google Sheets"""
+    global SHEET_NAME
     try:
         creds = get_google_credentials()
         if not creds:
@@ -79,7 +80,6 @@ def ler_dados_do_google_sheets():
                     range=range_name
                 ).execute()
                 values = result.get('values', [])
-                global SHEET_NAME
                 SHEET_NAME = "Sheet1"  # Atualiza o nome da aba
                 print("✅ Usando aba 'Sheet1'")
             except:
