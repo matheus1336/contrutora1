@@ -430,15 +430,9 @@
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 2rem;
             margin-top: 2rem;
-        }
-
-        @media (min-width: 1400px) {
-            .dashboard-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
         }
 
         .chart-container {
@@ -694,7 +688,7 @@
 <body>
     <div class="container">
         <header class="header fade-in">
-            <h1><i class="fas fa-chart-line"></i> Central Construtora - Dashboard</h1>
+            <h1><i class="fas fa-chart-line"></i> Dashboard Profissional de Obras</h1>
         </header>
 
         <div class="top-actions fade-in">
@@ -706,9 +700,6 @@
                     <div class="stats-number" id="total-obras">0</div>
                     <div class="stats-label">Total de Obras</div>
                 </div>
-                <button id="sync-data-btn" class="btn btn-info" style="margin-right: 1rem;">
-                    <i class="fas fa-sync-alt"></i> Sincronizar Dados
-                </button>
                 <button id="add-contact-btn" class="contact-btn">
                     <i class="fas fa-user-plus"></i> Novo Contato
                 </button>
@@ -798,14 +789,6 @@
                 <canvas id="segmentoChart"></canvas>
             </div>
             <div class="chart-container">
-                <h2><i class="fas fa-dollar-sign"></i> Valores por Status</h2>
-                <canvas id="valoresChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <h2><i class="fas fa-chart-bar"></i> Faturamento por Regional</h2>
-                <canvas id="faturamentoChart"></canvas>
-            </div>
-            <div class="chart-container">
                 <h2><i class="fas fa-globe-americas"></i> Mapa de Obras</h2>
                 <div id="map"></div>
             </div>
@@ -854,131 +837,13 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function() {
-            let obras = [];
+        document.addEventListener('DOMContentLoaded', function() {
+            let obras = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
             const tableHead = document.querySelector('#edit-table thead');
             const tableBody = document.querySelector('#edit-table tbody');
             const dashboardGrid = document.querySelector('.dashboard-grid');
             let regionalChart = null;
             let segmentoChart = null;
-
-            // Carrega dados automaticamente do Google Drive
-            async function carregarDadosAutomaticamente() {
-                try {
-                    console.log('🔄 Carregando dados do Google Drive...');
-                    const response = await fetch('/api/carregar-dashboard');
-                    const result = await response.json();
-                    
-                    if (response.ok && result.data && result.data.length > 0) {
-                        obras = result.data;
-                        console.log(`✅ ${obras.length} obras carregadas do Google Drive`);
-                        
-                        // Atualiza localStorage para manter sincronizado
-                        localStorage.setItem('obrasParaDashboard', JSON.stringify(obras));
-                        localStorage.setItem('lastSyncTime', Date.now().toString());
-                        
-                        // Renderiza a tabela e atualiza interface
-                        renderTable(obras);
-                        populateFilters(obras);
-                        updateStats();
-                        return true;
-                    } else {
-                        console.log('📄 Nenhum dado encontrado no Google Drive, usando localStorage');
-                        obras = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
-                        if (obras.length > 0) {
-                            renderTable(obras);
-                            populateFilters(obras);
-                            updateStats();
-                        }
-                        return false;
-                    }
-                } catch (error) {
-                    console.error('❌ Erro ao carregar dados do Google Drive:', error);
-                    // Fallback para localStorage em caso de erro
-                    obras = JSON.parse(localStorage.getItem('obrasParaDashboard')) || [];
-                    if (obras.length > 0) {
-                        renderTable(obras);
-                        populateFilters(obras);
-                        updateStats();
-                    }
-                    return false;
-                }
-            }
-
-            // Função para sincronização automática
-            async function sincronizacaoAutomatica() {
-                const lastSync = localStorage.getItem('lastSyncTime');
-                const agora = Date.now();
-                const INTERVALO_SYNC = 30000; // 30 segundos
-
-                if (!lastSync || (agora - parseInt(lastSync)) > INTERVALO_SYNC) {
-                    try {
-                        const response = await fetch('/api/carregar-dashboard');
-                        const result = await response.json();
-                        
-                        if (response.ok && result.data && result.data.length > 0) {
-                            const dadosNovos = JSON.stringify(result.data);
-                            const dadosAtuais = localStorage.getItem('obrasParaDashboard');
-                            
-                            // Só atualiza se os dados mudaram
-                            if (dadosNovos !== dadosAtuais) {
-                                console.log('🔄 Sincronizando novos dados do Google Drive...');
-                                obras = result.data;
-                                localStorage.setItem('obrasParaDashboard', dadosNovos);
-                                localStorage.setItem('lastSyncTime', agora.toString());
-                                
-                                renderTable(obras);
-                                populateFilters(obras);
-                                updateStats();
-                                
-                                // Mostra notificação visual
-                                mostrarNotificacaoSync();
-                            }
-                        }
-                    } catch (error) {
-                        console.warn('Erro na sincronização automática:', error);
-                    }
-                }
-            }
-
-            // Função para mostrar notificação de sincronização
-            function mostrarNotificacaoSync() {
-                const notification = document.createElement('div');
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                    color: white;
-                    padding: 1rem 2rem;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    z-index: 10000;
-                    font-weight: 500;
-                    animation: slideIn 0.3s ease;
-                `;
-                notification.innerHTML = '<i class="fas fa-sync-alt"></i> Dados sincronizados!';
-                
-                document.body.appendChild(notification);
-                
-                setTimeout(() => {
-                    notification.style.animation = 'slideOut 0.3s ease';
-                    setTimeout(() => notification.remove(), 300);
-                }, 2000);
-            }
-
-            // Carrega dados automaticamente ao inicializar
-            await carregarDadosAutomaticamente();
-
-            // Inicia sincronização automática a cada 30 segundos
-            setInterval(sincronizacaoAutomatica, 30000);
-            
-            // Também sincroniza quando a aba ganha foco (usuário volta ao navegador)
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    sincronizacaoAutomatica();
-                }
-            });
 
             // Define os cabeçalhos da tabela de edição
             const headers = [
@@ -1273,15 +1138,11 @@
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.message || 'Erro no servidor');
 
-                    alert('Dashboard atualizado no Google Drive com sucesso! Agora todos os usuários verão os mesmos dados.');
+                    alert('Dashboard atualizado no Google Drive com sucesso!');
                     dashboardGrid.style.display = 'grid';
                     
                     obras = updatedData;
                     localStorage.setItem('obrasParaDashboard', JSON.stringify(updatedData));
-                    
-                    // Força atualização dos filtros e estatísticas
-                    populateFilters(updatedData);
-                    updateStats();
                     
                     setTimeout(() => {
                         map.invalidateSize();
@@ -1384,14 +1245,9 @@
                 return { lat: -14.2, lon: -51.9 };
             }
 
-            let valoresChart = null;
-            let faturamentoChart = null;
-
             function createOrUpdateCharts(data) {
                 if (regionalChart) regionalChart.destroy();
                 if (segmentoChart) segmentoChart.destroy();
-                if (valoresChart) valoresChart.destroy();
-                if (faturamentoChart) faturamentoChart.destroy();
 
                 updateMap(data);
 
@@ -1479,117 +1335,6 @@
                             legend: {
                                 labels: {
                                     color: '#ffffff'
-                                }
-                            }
-                        }
-                    }
-                });
-
-                // Gráfico de Valores por Status
-                const valoresPorStatus = data.reduce((acc, item) => {
-                    if (item.status && item.precoProduto) {
-                        const valor = parseFloat(item.precoProduto) || 0;
-                        acc[item.status] = (acc[item.status] || 0) + valor;
-                    }
-                    return acc;
-                }, {});
-
-                valoresChart = new Chart(document.getElementById('valoresChart'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(valoresPorStatus),
-                        datasets: [{
-                            data: Object.values(valoresPorStatus),
-                            backgroundColor: [
-                                'rgba(67, 233, 123, 0.8)',
-                                'rgba(102, 126, 234, 0.8)',
-                                'rgba(250, 112, 154, 0.8)'
-                            ],
-                            borderColor: [
-                                'rgba(67, 233, 123, 1)',
-                                'rgba(102, 126, 234, 1)',
-                                'rgba(250, 112, 154, 1)'
-                            ],
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    color: '#ffffff'
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.parsed;
-                                        return context.label + ': R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                // Gráfico de Faturamento por Regional
-                const faturamentoPorRegional = data.reduce((acc, item) => {
-                    if (item.regional && item.precoProduto && item.status === 'Fechado') {
-                        const valor = parseFloat(item.precoProduto) || 0;
-                        acc[item.regional] = (acc[item.regional] || 0) + valor;
-                    }
-                    return acc;
-                }, {});
-
-                faturamentoChart = new Chart(document.getElementById('faturamentoChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: Object.keys(faturamentoPorRegional),
-                        datasets: [{
-                            label: 'Faturamento (R$)',
-                            data: Object.values(faturamentoPorRegional),
-                            backgroundColor: 'rgba(67, 233, 123, 0.8)',
-                            borderColor: 'rgba(67, 233, 123, 1)',
-                            borderWidth: 2,
-                            borderRadius: 8
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    color: '#ffffff'
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.parsed.y;
-                                        return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                ticks: {
-                                    color: '#b8bcc8',
-                                    callback: function(value) {
-                                        return 'R$ ' + value.toLocaleString('pt-BR');
-                                    }
-                                },
-                                grid: {
-                                    color: 'rgba(255, 255, 255, 0.1)'
-                                }
-                            },
-                            x: {
-                                ticks: {
-                                    color: '#b8bcc8'
-                                },
-                                grid: {
-                                    color: 'rgba(255, 255, 255, 0.1)'
                                 }
                             }
                         }
@@ -1724,24 +1469,6 @@
                 alert('Contato do comprador salvo com sucesso!');
                 modal.style.display = 'none';
                 contactForm.reset();
-            });
-
-            // Botão de sincronização manual
-            document.getElementById('sync-data-btn').addEventListener('click', async function() {
-                const button = this;
-                const originalContent = button.innerHTML;
-                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sincronizando...';
-                button.disabled = true;
-
-                try {
-                    await carregarDadosAutomaticamente();
-                    alert('Dados sincronizados com sucesso!');
-                } catch (error) {
-                    alert('Erro ao sincronizar dados: ' + error.message);
-                } finally {
-                    button.innerHTML = originalContent;
-                    button.disabled = false;
-                }
             });
 
             updateStats();
