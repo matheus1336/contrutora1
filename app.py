@@ -198,6 +198,28 @@ def salvar_dashboard():
         print(f"Erro ao salvar no Drive: {e}")
         return jsonify({"error": "Falha ao salvar no Google Drive", "message": str(e)}), 500
 
+@app.route('/api/salvar-contato-comprador', methods=['POST'])
+def salvar_contato_comprador():
+    dados_contato = request.get_json()
+    
+    try:
+        # Aqui você pode salvar os dados do comprador no banco de dados
+        # Por enquanto, apenas retornamos sucesso
+        print(f"Contato do comprador salvo: {dados_contato}")
+        
+        return jsonify({
+            "success": True, 
+            "message": "Contato do comprador salvo com sucesso!",
+            "data": dados_contato
+        })
+        
+    except Exception as e:
+        print(f"Erro ao salvar contato do comprador: {e}")
+        return jsonify({
+            "error": "Falha ao salvar contato do comprador", 
+            "message": str(e)
+        }), 500
+
 @app.route('/health')
 def health():
     return "OK", 200
