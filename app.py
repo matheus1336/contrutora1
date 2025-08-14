@@ -91,15 +91,29 @@ def login():
     resp.raise_for_status()
     return resp.json()["data"]["token"]
 
-def get_real_estate_report(token, type_export=1, limit_days=30, limit_obras=5000):
+def get_real_estate_report_paginated(token, limit_obras=5000, chunk_size=500):
+    """Busca obras da API em blocos para economizar memória"""
     url = "https://api.rededeobras.com.br/export/StandardWorksReport/RealEstate"
     headers = {"Authorization": f"Bearer {token}", "accept": "application/json"}
-    params = {"TypeExport": type_export, "LimitDays": limit_days}
-    resp = requests.get(url, headers=headers, params=params)
-    resp.raise_for_status()
-    data = resp.json().get("data", [])
-    return data[:limit_obras]  # limita a 5.000 obras
+    todas_obras = []
+    offset = 0
 
+    while len(todas_obras) < limit_obras:
+        params = {
+            "TypeExport": 1,
+            "LimitDays": 30,
+            "Offset": offset,  # Supondo que a API aceite offset (se não, precisamos outro parâmetro)
+            "Limit": min(chunk_size, limit_obras - len(todas_obras))
+        }
+        resp = requests.get(url, headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json().get("data", [])
+        if not data:
+            break
+        todas_obras.extend(data)
+        offset += len(data)
+    return todas_obras
+    
 @app.route('/api/obras', methods=['GET'])
 def obter_obras():
     try:
